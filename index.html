@@ -6,9 +6,9 @@
 <style>
 /* ---- tokens: SCE charcoal + one brand accent (set per event in settings) ---- */
 :root{
-  --brand:#1F5AA6;
+  --brand:#00CAC6;
   --bg:#F3F3F1; --surface:#FFFFFF; --surface-2:#E9E9E6; --ink:#262626; --ink-2:#686865; --line:#D4D4D0; --logo:#3E3E3E;
-  --accent:var(--brand); --accent-ink:#FFFFFF; --accent-soft:color-mix(in srgb,var(--brand) 10%,transparent);
+  --accent:var(--brand); --accent-ink:var(--brand-ink,#FFFFFF); --accent-soft:color-mix(in srgb,var(--brand) 10%,transparent);
   --yes:var(--accent); --no:var(--ink); --ok:#1E7A4C; --bad:#B3362A;
   --c1:var(--accent); --c2:var(--ink); --c3:color-mix(in srgb,var(--accent) 55%,var(--ink)); --c4:var(--ink-2); --c5:var(--accent);
   --shadow:none; --r:2px;
@@ -251,6 +251,12 @@ input[type=color].input{padding:2px;height:42px;width:72px}
 /* landing / login */
 .center-page{min-height:100%;display:grid;place-items:center;padding:24px 16px}
 .panel{width:min(440px,100%);background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--ink);padding:26px 22px;display:grid;gap:16px}
+.rooms{display:grid;gap:0;border-top:1px solid var(--line);max-height:40vh;overflow:auto}
+.rooms button{display:grid;grid-template-columns:1fr auto;gap:2px 12px;text-align:start;background:none;border:0;border-bottom:1px solid var(--line);padding:10px 4px}
+.rooms button:hover{background:var(--surface-2)}
+.rooms b{font-size:17px}.rooms .code{font-family:var(--mono);font-weight:500;direction:ltr;color:var(--ink-2)}
+.rooms small{grid-column:1/-1;color:var(--ink-2);font-size:14px}
+.rooms button.cur{box-shadow:inset -4px 0 0 var(--accent)}
 .panel h1{font-family:var(--display);font-size:38px;line-height:1.1;margin:0;letter-spacing:-.015em}
 
 @media (max-width:900px){
@@ -321,9 +327,15 @@ const LS = {
 };
 const rid = () => Math.random().toString(36).slice(2, 9);
 const PULSE = 'M0 12 H10 L14 3 L19 21 L24 7 L27 12 H44';
-const DEFAULT_ACCENT = '#1F5AA6';
+const DEFAULT_ACCENT = '#00CAC6';
 const brandHTML = () => `<span class="brand"><span class="logo" role="img" aria-label="SCE המכללה האקדמית להנדסה ע״ש סמי שמעון"></span><span class="rule"></span>${markHTML()}</span>`;
-function applyAccent(v) { document.documentElement.style.setProperty('--brand', /^#[0-9a-f]{6}$/i.test(v || '') ? v : DEFAULT_ACCENT); }
+function applyAccent(v) {
+  const c = /^#[0-9a-f]{6}$/i.test(v || '') ? v : DEFAULT_ACCENT, r = document.documentElement.style;
+  r.setProperty('--brand', c);
+  const [R, G, Bl] = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16) / 255).map(x => x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4);
+  const L = .2126 * R + .7152 * G + .0722 * Bl;          // light brand colours get dark text on top of them
+  r.setProperty('--brand-ink', L > .35 ? '#0B2B2A' : '#FFFFFF');
+}
 const markHTML = () => `<span class="mark"><svg viewBox="0 0 44 24" aria-hidden="true"><path d="${PULSE}"/></svg>דופק</span>`;
 const WAVE = '<svg viewBox="0 0 180 60" aria-hidden="true"><path d="M0 30 H50 L60 12 L72 50 L84 18 L92 30 H180"/></svg>';
 const TYPE_LABEL = { open: 'שאלה פתוחה', yesno: 'כן / לא', choice: 'בחירה' };
@@ -389,6 +401,7 @@ async function makeLive() {
     async logout() { await auth.signOut(); },
     watchRoom(c, cb, err) { return R(c).onSnapshot(s => cb(s.exists ? s.data() : null), e => err && err(e)); },
     async getRoom(c) { const s = await R(c).get(); return s.exists ? s.data() : null; },
+    async listRooms() { const s = await db.collection('rooms').get(); return s.docs.map(d => ({ code: d.id, title: d.data().title || '', createdAt: d.data().createdAt || 0, n: (d.data().deck || []).length })); },
     async saveRoom(c, patch) { await R(c).set(patch, { merge: true }); },
     async replaceField(c, field, value) { await R(c).update({ [field]: value }); },
     watchAnswers(c, cb, err) { return R(c).collection('answers').onSnapshot(s => cb(s.docs.map(d => ({ id: d.id, ...d.data() }))), e => err && err(e)); },
@@ -416,6 +429,7 @@ function makeDemo() {
     async anon() { return me; }, async hostLogin() { }, async logout() { },
     watchRoom: (c, cb) => on('room', c, cb),
     async getRoom(c) { return snap('room', c); },
+    async listRooms() { return Object.entries(st.rooms).map(([code, r]) => ({ code, title: r.title || '', createdAt: r.createdAt || 0, n: (r.deck || []).length })); },
     async saveRoom(c, patch) { st.rooms[c] = deepMerge(st.rooms[c] || {}, patch); emit('room', c); },
     async replaceField(c, f, v) { st.rooms[c][f] = v; emit('room', c); },
     watchAnswers: (c, cb) => on('answers', c, cb),
@@ -535,15 +549,32 @@ function renderLogin(root) {
 
 function renderRoomPicker(root) {
   H.unsubs.forEach(f => f && f()); H.unsubs = [];
-  root.innerHTML = `<div class="center-page"><form class="panel" id="rp">
-    <div>${brandHTML()}</div><h1>איזה אירוע?</h1>
-    <p class="help">כל אירוע מקבל קוד חדר משלו. קוד קיים פותח את האירוע עם כל התשובות שלו, קוד חדש יוצר אירוע חדש עם סט השאלות המומלץ.</p>
-    <div class="field"><label for="rc">קוד חדר (אותיות באנגלית וספרות)</label><input class="input" id="rc" dir="ltr" maxlength="10" required pattern="[A-Za-z0-9]{3,10}" value="${esc(LS.get('room', '') || 'OPEN26')}"></div>
-    <div class="field"><label for="rt">שם האירוע (לאירוע חדש)</label><input class="input" id="rt" value="כנס פתיחה - המכינה הקדם-אקדמית"></div>
-    <button class="btn primary send" type="submit">פתיחה</button>
+  const last = LS.get('room', '');
+  root.innerHTML = `<div class="center-page"><div class="panel">
+    <div>${brandHTML()}</div><h1>האירועים שלי</h1>
+    <div class="rooms" id="rooms"><p class="muted" style="margin:10px 0">טוען…</p></div>
+    <form id="rp" style="display:grid;gap:14px;margin-top:6px">
+      <h2 style="margin:8px 0 0;font-size:20px">אירוע חדש</h2>
+      <div class="field"><label for="rc">קוד חדר (אותיות באנגלית וספרות, 3-10 תווים)</label><input class="input" id="rc" dir="ltr" maxlength="10" required pattern="[A-Za-z0-9]{3,10}" placeholder="OPEN26"></div>
+      <div class="field"><label for="rt">שם האירוע</label><input class="input" id="rt" value="כנס פתיחה - המכינה הקדם-אקדמית"></div>
+      <div class="err" id="rperr" hidden></div>
+      <button class="btn primary send" type="submit">יצירה ופתיחה</button>
+    </form>
     ${B.mode === 'live' ? '<button class="btn ghost" type="button" id="lo">התנתקות</button>' : ''}
-  </form></div>`;
-  $('#rp', root).addEventListener('submit', e => { e.preventDefault(); openRoom(root, $('#rc', root).value.trim().toUpperCase(), $('#rt', root).value.trim()); });
+  </div></div>`;
+  let known = new Set();
+  B.listRooms().then(rs => {
+    rs.sort((a, b) => b.createdAt - a.createdAt); known = new Set(rs.map(r => r.code));
+    $('#rooms', root).innerHTML = rs.length ? rs.map(r => `<button type="button" data-room="${esc(r.code)}" class="${r.code === last ? 'cur' : ''}"><b>${esc(r.title || 'ללא שם')}</b><span class="code">${esc(r.code)}</span>
+      <small>${r.createdAt ? new Date(r.createdAt).toLocaleDateString('he-IL') + ' · ' : ''}${r.n} שאלות${r.code === last ? ' · האירוע האחרון שפתחת' : ''}</small></button>`).join('')
+      : '<p class="muted" style="margin:10px 0">עדיין אין אירועים. צרו את הראשון למטה.</p>';
+  }).catch(e => { console.error(e); $('#rooms', root).innerHTML = '<p class="muted" style="margin:10px 0">לא הצלחתי לטעון את הרשימה. אפשר עדיין לפתוח אירוע לפי קוד למטה.</p>'; });
+  $('#rooms', root).addEventListener('click', e => { const b = e.target.closest('[data-room]'); if (b) openRoom(root, b.dataset.room); });
+  $('#rp', root).addEventListener('submit', e => {
+    e.preventDefault(); const code = $('#rc', root).value.trim().toUpperCase(), er = $('#rperr', root);
+    if (known.has(code)) { er.hidden = false; er.textContent = `האירוע ${code} כבר קיים. לחצו עליו ברשימה למעלה כדי לפתוח אותו, או בחרו קוד אחר.`; return; }
+    openRoom(root, code, $('#rt', root).value.trim());
+  });
   const lo = $('#lo', root); if (lo) lo.onclick = () => B.logout();
 }
 
@@ -830,7 +861,7 @@ function openSettings(note) {
     <p class="help">מפתח חינמי: נכנסים ל-<code>aistudio.google.com</code> עם חשבון Google, לוחצים Get API key ואז Create API key, ומדביקים כאן. המפתח לא עובר לסטודנטים ולא נשמר בשרת. ${window.claude ? 'בתצוגה בתוך Claude אפשר לסכם גם בלי מפתח.' : ''}</p>
     <div class="field"><label>האירוע הנוכחי: <b dir="ltr">${esc(H.code)}</b></label>
       <div class="row" style="display:flex;gap:8px;flex-wrap:wrap">
-        ${B.mode === 'live' ? '<button class="btn" data-s="switch">מעבר לאירוע אחר</button>' : ''}
+        <button class="btn" data-s="switch">האירועים שלי / אירוע חדש</button>
         <button class="btn danger" data-s="clearq">איפוס תשובות לשאלה הנוכחית</button>
         <button class="btn danger" data-s="reset">איפוס כל האירוע</button>
         ${B.mode === 'live' ? '<button class="btn ghost" data-s="logout">התנתקות</button>' : ''}</div>
@@ -846,7 +877,7 @@ function openSettings(note) {
       const ac = $('#s-accent').value; if (/^#[0-9a-f]{6}$/i.test(ac) && ac !== H.room.accent) await B.saveRoom(H.code, { accent: ac });
       closeModal(); toast('נשמר');
     } else if (s === 'accentReset') { $('#s-accent').value = DEFAULT_ACCENT; }
-    else if (s === 'switch') { closeModal(); LS.set('room', ''); renderRoomPicker($('#app')); }
+    else if (s === 'switch') { closeModal(); renderRoomPicker($('#app')); }
     else if (s === 'logout') { closeModal(); LS.set('room', ''); await B.logout(); }
     else if (s === 'clearq' || s === 'reset') {
       const cf = $('#s-confirm');
