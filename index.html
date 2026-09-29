@@ -1,4 +1,4 @@
-<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="description" content="דופק - שאלות לקהל בזמן אמת">
+<!doctype html><html lang="he" dir="rtl" translate="no"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="description" content="דופק - שאלות לקהל בזמן אמת"><meta name="google" content="notranslate">
 <title>דופק</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -519,7 +519,7 @@ function renderLogin(root) {
     <div class="field"><label for="pw">סיסמה</label><input class="input" id="pw" type="password" autocomplete="current-password" required dir="ltr"></div>
     <div class="err" id="lerr" hidden></div>
     <button class="btn primary send" type="submit">כניסה</button>
-    <p class="help">המשתמש נוצר פעם אחת ב-Firebase (Authentication &gt; Users). סטודנטים לא צריכים להתחבר.</p>
+    <p class="help">נכנסים עם המשתמש שנוצר ב-Firebase. סטודנטים לא צריכים להתחבר.</p>
   </form></div>`;
   $('#login', root).addEventListener('submit', async e => {
     e.preventDefault(); const er = $('#lerr', root); er.hidden = true;
@@ -552,7 +552,7 @@ async function openRoom(root, code, title) {
       await B.saveRoom(code, r);
     }
   } catch (e) { toast('אין הרשאה לחדר. בדקו שהאימייל שלכם מופיע בכללי האבטחה.'); console.error(e); return renderRoomPicker(root); }
-  LS.set('room', code);
+  if (B.mode === 'live') LS.set('room', code);
   buildHostShell(root);
   const onErr = e => { console.error(e); toast('בעיית חיבור: ' + (e.code || e.message)); };
   H.unsubs.push(B.watchRoom(code, r => { H.room = r; renderHost(); }, onErr));
