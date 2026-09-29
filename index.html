@@ -251,7 +251,12 @@ input[type=color].input{padding:2px;height:42px;width:72px}
 /* landing / login */
 .center-page{min-height:100%;display:grid;place-items:center;padding:24px 16px}
 .panel{width:min(440px,100%);background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--ink);padding:26px 22px;display:grid;gap:16px}
-.rooms{display:grid;gap:0;border-top:1px solid var(--line);max-height:40vh;overflow:auto}
+.rooms-dd{border:1px solid var(--line)}
+.rooms-dd summary{list-style:none;display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;font-weight:700;font-size:17px}
+.rooms-dd summary::-webkit-details-marker{display:none}
+.rooms-dd .chev{margin-inline-start:auto;width:10px;height:10px;border-inline-end:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:rotate(45deg);transition:transform .2s;margin-top:-4px}
+.rooms-dd[open] .chev{transform:rotate(-135deg);margin-top:4px}
+.rooms{display:grid;gap:0;border-top:1px solid var(--line);max-height:40vh;overflow:auto;padding:0 10px}
 .rooms button{display:grid;grid-template-columns:1fr auto;gap:2px 12px;text-align:start;background:none;border:0;border-bottom:1px solid var(--line);padding:10px 4px}
 .rooms button:hover{background:var(--surface-2)}
 .rooms b{font-size:17px}.rooms .code{font-family:var(--mono);font-weight:500;direction:ltr;color:var(--ink-2)}
@@ -551,8 +556,8 @@ function renderRoomPicker(root) {
   H.unsubs.forEach(f => f && f()); H.unsubs = [];
   const last = LS.get('room', '');
   root.innerHTML = `<div class="center-page"><div class="panel">
-    <div>${brandHTML()}</div><h1>האירועים שלי</h1>
-    <div class="rooms" id="rooms"><p class="muted" style="margin:10px 0">טוען…</p></div>
+    <div>${brandHTML()}</div><h1>איזה אירוע?</h1>
+    <details class="rooms-dd"><summary><span>האירועים שלי</span><span class="cnt muted num" id="rcnt"></span><span class="chev" aria-hidden="true"></span></summary><div class="rooms" id="rooms"><p class="muted" style="margin:10px 0">טוען…</p></div></details>
     <form id="rp" style="display:grid;gap:14px;margin-top:6px">
       <h2 style="margin:8px 0 0;font-size:20px">אירוע חדש</h2>
       <div class="field"><label for="rc">קוד חדר (אותיות באנגלית וספרות, 3-10 תווים)</label><input class="input" id="rc" dir="ltr" maxlength="10" required pattern="[A-Za-z0-9]{3,10}" placeholder="OPEN26"></div>
@@ -564,7 +569,7 @@ function renderRoomPicker(root) {
   </div></div>`;
   let known = new Set();
   B.listRooms().then(rs => {
-    rs.sort((a, b) => b.createdAt - a.createdAt); known = new Set(rs.map(r => r.code));
+    rs.sort((a, b) => b.createdAt - a.createdAt); known = new Set(rs.map(r => r.code)); $('#rcnt', root).textContent = rs.length ? `(${rs.length})` : '';
     $('#rooms', root).innerHTML = rs.length ? rs.map(r => `<button type="button" data-room="${esc(r.code)}" class="${r.code === last ? 'cur' : ''}"><b>${esc(r.title || 'ללא שם')}</b><span class="code">${esc(r.code)}</span>
       <small>${r.createdAt ? new Date(r.createdAt).toLocaleDateString('he-IL') + ' · ' : ''}${r.n} שאלות${r.code === last ? ' · האירוע האחרון שפתחת' : ''}</small></button>`).join('')
       : '<p class="muted" style="margin:10px 0">עדיין אין אירועים. צרו את הראשון למטה.</p>';
