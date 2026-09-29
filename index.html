@@ -128,8 +128,13 @@ input[type=color].input{padding:2px;height:42px;width:72px}
 @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* cloud */
-.cloud{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:center;gap:4px 26px;padding:10px 0;min-height:100%;align-content:center}
-.cloud span{font-family:var(--display);font-weight:700;line-height:1.05;animation:fade .6s ease-out both;white-space:nowrap;letter-spacing:0}
+.cloud{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:.35em 1.1em;padding:8px 0;min-height:100%;align-content:center;font-size:clamp(16px,2vw,28px)}
+.cloud .bub{display:inline-block;max-width:min(24ch,100%);padding:.12em .1em;color:var(--h);font-family:var(--display);font-weight:800;line-height:1;text-align:center;text-wrap:balance;overflow-wrap:anywhere;animation:fade .5s ease-out both}
+.cloud .bub.one{white-space:nowrap;max-width:none}
+.cloud .bub .x{font-size:.42em;font-weight:700;color:var(--h);opacity:.6;margin-inline-start:.3em;vertical-align:super;white-space:nowrap}
+.bub.hue0{--h:#1F5AA6}.bub.hue1{--h:#B3362A}.bub.hue2{--h:#1E7A4C}.bub.hue3{--h:#6A45B8}.bub.hue4{--h:#B8620A}.bub.hue5{--h:#0B7A8A}.bub.hue6{--h:#A8327A}.bub.hue7{--h:#4F7A12}.bub.hue8{--h:#8A6D00}.bub.hue9{--h:#4A5B6E}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .bub.hue0{--h:#7FB2FF}:root:not([data-theme="light"]) .bub.hue1{--h:#FF8A7A}:root:not([data-theme="light"]) .bub.hue2{--h:#5CC98E}:root:not([data-theme="light"]) .bub.hue3{--h:#B9A0FF}:root:not([data-theme="light"]) .bub.hue4{--h:#FFB25C}:root:not([data-theme="light"]) .bub.hue5{--h:#5BD1E8}:root:not([data-theme="light"]) .bub.hue6{--h:#FF8FC8}:root:not([data-theme="light"]) .bub.hue7{--h:#B5E06A}:root:not([data-theme="light"]) .bub.hue8{--h:#FFE066}:root:not([data-theme="light"]) .bub.hue9{--h:#B8C6D8}}
+:root[data-theme="dark"] .bub.hue0{--h:#7FB2FF}:root[data-theme="dark"] .bub.hue1{--h:#FF8A7A}:root[data-theme="dark"] .bub.hue2{--h:#5CC98E}:root[data-theme="dark"] .bub.hue3{--h:#B9A0FF}:root[data-theme="dark"] .bub.hue4{--h:#FFB25C}:root[data-theme="dark"] .bub.hue5{--h:#5BD1E8}:root[data-theme="dark"] .bub.hue6{--h:#FF8FC8}:root[data-theme="dark"] .bub.hue7{--h:#B5E06A}:root[data-theme="dark"] .bub.hue8{--h:#FFE066}:root[data-theme="dark"] .bub.hue9{--h:#B8C6D8}
 
 /* bars */
 .yn{display:grid;grid-template-columns:1fr 1fr;gap:40px;height:100%;min-height:280px}
@@ -643,28 +648,40 @@ function renderWall(viz, list) {
 }
 
 const STOP = new Set('של את על עם זה זו זאת אני אתה את הוא היא אנחנו אתם הם הן לא כן גם או אבל כי מה איך יותר הכי כל יש אין רק עוד מאוד להיות היה שלי לי לנו לכם אם אז כמו בין אחרי לפני וגם שאני שזה אותי אותו משהו הרבה קצת ש ו ה ב ל מ כ עם שלא שיהיה יהיה זמן the and to of a in is'.split(' '));
-function cloudData(texts) {
-  const norm = t => t.replace(/[֑-ׇ]/g, '').replace(/[^\p{L}\p{N}\s-]/gu, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
-  const N = texts.map(norm).filter(Boolean);
-  const short = N.filter(t => t.split(' ').length <= 3).length >= N.length * 0.6;
+// Each answer stays whole (never split into words). Identical answers are merged and grow with their count.
+function cloudData(list) {
+  const key = t => t.replace(/[֑-ׇ]/g, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
   const m = new Map();
-  for (const t of N) {
-    if (short) m.set(t, (m.get(t) || 0) + 1);
-    else for (const w of new Set(t.split(' '))) if (w.length > 1 && !STOP.has(w)) m.set(w, (m.get(w) || 0) + 1);
+  for (const a of [...list].sort((x, y) => x.t - y.t)) {
+    const text = String(a.value).replace(/\s+/g, ' ').trim(), k = key(text);
+    if (!k) continue;
+    const g = m.get(k); if (g) g.n++; else m.set(k, { k, text, n: 1, c: m.size % 10 });
   }
-  return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 36);
+  return [...m.values()].sort((a, b) => b.n - a.n).slice(0, 48);
 }
+function hashHue(s) { let h = 0; for (const ch of s) h = (h * 31 + ch.codePointAt(0)) >>> 0; return h % 10; }
 function renderCloud(viz, list, qid) {
-  const data = cloudData(list.map(a => a.value));
-  if (!data.length) { viz.innerHTML = '<div class="empty">ענן המילים יתמלא ברגע שיגיעו תשובות</div>'; return; }
-  const max = data[0][1], min = data[data.length - 1][1];
-  const arranged = []; data.forEach((d, i) => { const e = [d[0], d[1], i]; i % 2 ? arranged.push(e) : arranged.unshift(e); });
+  const data = cloudData(list);
+  if (!data.length) { viz.innerHTML = '<div class="empty">התשובות יופיעו כאן ברגע שיגיעו</div>'; return; }
+  const max = data[0].n, min = data[data.length - 1].n;
+  const arranged = []; data.forEach((d, i) => i % 2 ? arranged.push(d) : arranged.unshift(d));
   const anim = H.cloudAnim !== qid; H.cloudAnim = qid;
-  viz.innerHTML = `<div class="cloud">${arranged.map(([w, n, rank], i) => {
-    const r = max === min ? 1 : (Math.sqrt(n) - Math.sqrt(min)) / (Math.sqrt(max) - Math.sqrt(min));
-    const size = Math.round(24 + r * 104);
-    return `<span style="font-size:${size}px;color:${rank < 3 ? 'var(--accent)' : rank % 2 ? 'var(--ink)' : 'var(--ink-2)'};${anim ? `animation-delay:${i * 40}ms` : 'animation:none'}" title="${n}">${esc(w)}</span>`;
+  const many = data.length > 24;
+  viz.innerHTML = `<div class="cloud">${arranged.map((d, i) => {
+    const r = max === min ? 0.5 : (Math.sqrt(d.n) - Math.sqrt(min)) / (Math.sqrt(max) - Math.sqrt(min));
+    let size = (many ? 18 : 22) + r * (many ? 44 : 70);
+    const len = [...d.text].length;
+    if (len > 12) size = Math.min(size, Math.max(17, 34 - (len - 12) * 0.35));
+    const words = d.text.split(' ').length;
+    return `<span class="bub hue${d.c}${words <= 3 ? ' one' : ''}" style="font-size:${Math.round(size)}px;${anim ? `animation-delay:${i * 35}ms` : 'animation:none'}">${esc(d.text)}${d.n > 1 ? `<b class="x num">×${d.n}</b>` : ''}</span>`;
   }).join('')}</div>`;
+  fitCloud(viz);
+}
+function fitCloud(viz) {
+  const c = viz.querySelector('.cloud'); if (!c) return;
+  for (let k = 0; k < 12 && c.scrollHeight > viz.clientHeight + 2; k++) {
+    c.querySelectorAll('.bub').forEach(b => { b.style.fontSize = Math.max(13, parseFloat(b.style.fontSize) * 0.88) + 'px'; });
+  }
 }
 
 function renderResults(viz, q, list, reveal) {
@@ -734,7 +751,7 @@ function renderControls(c, q) {
     ${q ? `<span class="sep"></span><div class="grp"><button class="btn ${c.open ? '' : 'on'}" data-act="toggleOpen" title="O">${c.open ? 'סגירת הצבעה' : 'פתיחת הצבעה'}</button></div>` : ''}
     ${isOpenQ ? `<span class="sep"></span><div class="grp" role="group" aria-label="תצוגה">
       <button class="btn ${view !== 'cloud' && view !== 'summary' ? 'on' : ''}" data-act="view" data-v="wall" title="W">קיר</button>
-      <button class="btn ${view === 'cloud' ? 'on' : ''}" data-act="view" data-v="cloud" title="C">ענן מילים</button>
+      <button class="btn ${view === 'cloud' ? 'on' : ''}" data-act="view" data-v="cloud" title="C">ענן תשובות</button>
       <button class="btn ${view === 'summary' ? 'on' : ''}" data-act="view" data-v="summary" title="S">סיכום AI</button></div>` : ''}
     ${q && !isOpenQ ? `<span class="sep"></span><button class="btn" data-act="reveal">${c.reveal === false ? 'חשיפת התוצאות' : 'הסתרת התוצאות'}</button>` : ''}
     <div class="spacer"></div>
