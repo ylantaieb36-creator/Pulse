@@ -894,18 +894,25 @@ function hostKeys(e) {
    בונוס ידני לכל קבוצה נשמר באירוע (bonus) ובמחשב המנחה. */
 const TEAM_COLORS = { gpt: '#10A37F', claude: '#D97757', gemini: '#4285F4' };
 const TEAM_FALLBACK = ['#E8505B', '#8E6CEF', '#F2B33D', '#2BB3A6', '#EC6FB0', '#5B8DEF'];
-const scoreQs = () => deck().filter(q => q.type === 'choice' && /ניקוד/.test(q.text || '') && (q.options || []).length >= 2);
+/* שאלת שיוך = שאלת בחירה שיש בנוסח שלה "שייך/שייכת" (ולא "ניקוד"). מי שסימן קבוצה לא רואה אותה בהצבעות, והקול שלו לקבוצה שלו לא נספר. */
+const isScoreQ = q => !!q && q.type === 'choice' && /ניקוד/.test(q.text || '') && (q.options || []).length >= 2;
+const findTeamQ = d => (d || []).find(q => q.type === 'choice' && /שייכ|שייך/.test(q.text || '') && !/ניקוד/.test(q.text || '')) || null;
+const scoreQs = () => deck().filter(isScoreQ);
+function membership() { const tq = findTeamQ(deck()), m = {}; if (tq) ansFor(tq.id).slice().sort((a, b) => a.t - b.t).forEach(a => { if (a.uid) m[a.uid] = a.value; }); return m; }
 const teamColor = (t, i) => { const k = Object.keys(TEAM_COLORS).find(k => t.toLowerCase().includes(k)); return k ? TEAM_COLORS[k] : TEAM_FALLBACK[i % TEAM_FALLBACK.length]; };
 const teamShort = t => t.replace(/^קבוצת\s+/, '');
 function scoreData() {
   const qs = scoreQs(), teams = [];
   qs.forEach(q => q.options.forEach(o => { if (!teams.includes(o)) teams.push(o); }));
+  const mem = membership(), hasTeamQ = !!findTeamQ(deck());
   const rounds = qs.map((q, i) => {
-    const m = q.text.match(/^\s*([^|:]{1,24}?)\s*[|:]/), pts = {}, list = ansFor(q.id);
-    teams.forEach(t => pts[t] = 0); list.forEach(a => { if (a.value in pts) pts[a.value]++; });
-    return { label: m ? m[1].trim() : 'סבב ' + (i + 1), pts, votes: list.length };
+    const m = q.text.match(/^\s*([^|:]{1,24}?)\s*[|:]/), pts = {}, list = ansFor(q.id); let self = 0;
+    teams.forEach(t => pts[t] = 0);
+    list.forEach(a => { if (!(a.value in pts)) return; if (mem[a.uid] === a.value) { self++; return; } pts[a.value]++; });
+    return { label: m ? m[1].trim() : 'סבב ' + (i + 1), pts, votes: list.length - self, self };
   });
-  return { teams, rounds };
+  const sizes = {}; teams.forEach(t => sizes[t] = 0); Object.values(mem).forEach(t => { if (t in sizes) sizes[t]++; });
+  return { teams, rounds, hasTeamQ, sizes, assigned: Object.keys(mem).length };
 }
 function countTo(node, to) {
   const from = +node.dataset.v || 0; node.dataset.v = to;
@@ -944,9 +951,10 @@ function openScoreboard() {
   const cleanup = () => { clearInterval(timer); clearTimeout(timer); stopConfetti(); stopConfetti = () => { }; };
 
   function intro() {
-    const d = scoreData(), votes = d.rounds.reduce((a, r) => a + r.votes, 0);
+    const d = scoreData(), votes = d.rounds.reduce((a, r) => a + r.votes, 0), self = d.rounds.reduce((a, r) => a + r.self, 0);
     el.innerHTML = X + `<div class="sb-in"><div class="sb-kicker">${esc(H.room.title || '')}</div><h1 class="sb-title">🏆 לוח התוצאות</h1>
-      <p class="sb-sub"><span class="num">${votes}</span> הצבעות נספרו ב-<span class="num">${d.rounds.length}</span> סבבים</p>
+      <p class="sb-sub"><span class="num">${votes}</span> הצבעות נספרו ב-<span class="num">${d.rounds.length}</span> סבבים${self ? ` · <span class="num">${self}</span> קולות לקבוצה עצמית לא נספרו` : ''}</p>
+      ${d.hasTeamQ ? `<p class="sb-sub" style="font-size:clamp(15px,1.6vw,20px)">בקבוצות: ${d.teams.map(t => `<bdi>${esc(teamShort(t))}</bdi> <span class="num">${d.sizes[t]}</span>`).join(' · ')}</p>` : ''}
       <div class="sb-bonus"><div class="sb-bl">נקודות בונוס על טעויות שנתפסו (לא חובה)</div>${d.teams.map((t, i) => `<div class="sb-bt" style="--c:${teamColor(t, i)}"><span>${esc(teamShort(t))}</span>
         <button type="button" data-sb="minus" data-t="${esc(t)}" aria-label="הורדת נקודה">−</button><b class="num">${+bonus[t] || 0}</b><button type="button" data-sb="plus" data-t="${esc(t)}" aria-label="הוספת נקודה">+</button></div>`).join('')}</div>
       <p class="sb-hint">רווח או לחיצה כדי להתחיל · Esc ליציאה</p></div>`;
@@ -966,7 +974,7 @@ function openScoreboard() {
         <div class="sb-score"><b class="num" data-v="${prev[t]}">${prev[t]}</b><span class="sb-plus"></span></div></div>`; }).join('');
       void b.offsetWidth;
     }
-    $('#sbk', el).textContent = isB ? 'בונוס צייד הטעויות' : `${d.rounds[i].label} · ${d.rounds[i].votes} הצבעות`;
+    $('#sbk', el).textContent = isB ? 'בונוס צייד הטעויות' : `${d.rounds[i].label} · ${d.rounds[i].votes} הצבעות${d.rounds[i].self ? ` · ${d.rounds[i].self} לא נספרו (הצבעה לעצמם)` : ''}`;
     $('#sbt', el).textContent = isB ? 'אחרי הבונוס' : 'המצב אחרי ' + d.rounds[i].label;
     const r = ranked(d, tot), mx = Math.max(1, ...Object.values(tot)), lead = r[0] && r[0].s > 0 ? r.filter(x => x.rank === 1).map(x => x.t) : [];
     requestAnimationFrame(() => r.forEach((x, pos) => {
@@ -1243,10 +1251,11 @@ function createStudent(root, code, embedded) {
     else if (c.idx < 0 || !q) body = `<div class="stu-wait">${WAVE}<h2>אתם בפנים${S.name ? ', ' + esc(S.name) : ''}!</h2><div>תסתכלו על המסך. השאלה הראשונה תופיע כאן אוטומטית.</div></div>`;
     else {
       const mine = S.mine[q.id], editing = S.editing[q.id] || mine == null;
+      const tq = findTeamQ(r.deck || []), myTeam = tq ? S.mine[tq.id] : null;
       let ctl = '';
       if (!c.open) ctl = `<div class="muted">ההצבעה על השאלה הזו סגורה. תסתכלו על המסך${mine != null ? '' : ', השאלה הבאה תופיע כאן'}.</div>${mine != null ? `<div class="sent">✓ ענית: ${esc(mine)}</div>` : ''}`;
       else if (q.type === 'yesno') ctl = `<div class="yn-btns"><button class="y ${mine === 'כן' ? 'sel' : ''}" data-u="pick" data-v="כן" ${S.busy ? 'disabled' : ''}>כן</button><button class="n ${mine === 'לא' ? 'sel' : ''}" data-u="pick" data-v="לא" ${S.busy ? 'disabled' : ''}>לא</button></div>${mine != null ? '<div class="sent">✓ נקלט. אפשר לשנות עד שההצבעה נסגרת</div>' : ''}`;
-      else if (q.type === 'choice') ctl = `<div style="display:grid;gap:10px">${(q.options || []).map(o => `<button class="opt ${mine === o ? 'sel' : ''}" data-u="pick" data-v="${esc(o)}" ${S.busy ? 'disabled' : ''}>${esc(o)}</button>`).join('')}</div>${mine != null ? '<div class="sent">✓ נקלט. אפשר לשנות עד שההצבעה נסגרת</div>' : ''}`;
+      else if (q.type === 'choice') ctl = `<div style="display:grid;gap:10px">${myTeam && isScoreQ(q) && (q.options || []).includes(myTeam) && (q.options || []).length > 2 ? '<div class="muted" style="font-size:15px">הקבוצה שלך לא מופיעה כאן, אין הצבעה לעצמכם 😉</div>' : ''}${(q.options || []).filter(o => !(myTeam && isScoreQ(q) && o === myTeam && (q.options || []).length > 2)).map(o => `<button class="opt ${mine === o ? 'sel' : ''}" data-u="pick" data-v="${esc(o)}" ${S.busy ? 'disabled' : ''}>${esc(o)}</button>`).join('')}</div>${mine != null ? '<div class="sent">✓ נקלט. אפשר לשנות עד שההצבעה נסגרת</div>' : ''}`;
       else if (!editing) ctl = `<div class="sent">✓ התשובה שלך על המסך</div><div class="card" style="box-shadow:none">${esc(mine)}</div><button class="btn" data-u="edit">עריכת התשובה</button>`;
       else ctl = `<form data-u="open" style="display:grid;gap:10px"><textarea class="input" id="ans-${esc(q.id)}" maxlength="280" placeholder="כתבו כאן…" aria-label="התשובה שלך">${esc(S.draft[q.id] ?? mine ?? '')}</textarea>
           <div class="count-hint num"><span class="cc">${(S.draft[q.id] ?? mine ?? '').length}</span>/280</div>
