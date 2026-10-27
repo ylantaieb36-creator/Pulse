@@ -291,6 +291,43 @@ input[type=color].input{padding:2px;height:42px;width:72px}
 @media (max-height:820px){ .names{display:none} }
 @media (max-height:640px){ .lobby .lead{display:none} .controls .btn{padding:4px 10px} }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* scoreboard (team game) */
+.sb{position:fixed;inset:0;z-index:70;color:#FFFFFF;background:radial-gradient(120% 90% at 50% 0%,#5B2BB5 0%,#3A1A86 45%,#1E0B4A 100%);display:grid;place-items:center;overflow:hidden;font-family:var(--display);cursor:pointer;user-select:none}
+.sb-in{width:min(1200px,92vw);display:grid;gap:2.2vh;justify-items:center;text-align:center;position:relative;z-index:1}
+.sb-kicker{font-size:clamp(16px,2vw,28px);font-weight:700;letter-spacing:.03em;color:#FFD84D}
+.sb-title{font-size:clamp(40px,7vw,96px);font-weight:800;line-height:1.05;margin:0}
+.sb-sub{font-size:clamp(16px,2vw,24px);opacity:.85;margin:0}
+.sb-hint{font-size:15px;opacity:.6;margin:1vh 0 0}
+.sb-x{position:absolute;top:18px;left:18px;z-index:3;background:rgba(255,255,255,.14);color:#FFFFFF;border:0;border-radius:999px;width:44px;height:44px;font-size:20px;cursor:pointer}
+.sb-bonus{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:2vh;cursor:default}
+.sb-bl{width:100%;font-size:17px;opacity:.85}
+.sb-bt{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.1);border-inline-start:6px solid var(--c);padding:8px 14px;border-radius:12px;font-size:20px;font-weight:700}
+.sb-bt button{width:38px;height:38px;border-radius:50%;border:0;background:#FFFFFF;color:#2A0E61;font-size:22px;font-weight:800;cursor:pointer;line-height:1}
+.sb-bt b{min-width:30px;font-size:24px}
+.sb-board{position:relative;width:100%;margin-top:2vh}
+.sb-row{position:absolute;inset-inline:0;height:var(--rh);display:grid;grid-template-columns:minmax(140px,24%) 1fr 150px;align-items:center;gap:18px;transition:top .9s cubic-bezier(.2,.8,.2,1)}
+.sb-name{background:var(--c);color:#FFFFFF;font-weight:800;font-size:clamp(20px,2.6vw,38px);border-radius:12px;padding:.22em .6em;box-shadow:0 6px 0 rgba(0,0,0,.28);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sb-row.lead .sb-name::before{content:"👑 "}
+.sb-track{height:58%;background:rgba(255,255,255,.12);border-radius:12px;overflow:hidden}
+.sb-fill{height:100%;width:0;background:var(--c);border-radius:12px;transition:width 1.1s cubic-bezier(.2,.8,.2,1)}
+.sb-score{display:flex;align-items:baseline;gap:8px;font-size:clamp(30px,4vw,58px);font-weight:800;text-align:start}
+.sb-plus{font-size:clamp(16px,1.8vw,24px);color:#FFD84D;opacity:0;direction:ltr;unicode-bidi:isolate}
+.sb-plus.pop{animation:sbpop .9s ease .5s both}
+@keyframes sbpop{0%{opacity:0;transform:scale(.4)}45%{opacity:1;transform:scale(1.35)}100%{opacity:1;transform:scale(1)}}
+.sb-count{font-size:clamp(140px,24vw,320px);font-weight:800;line-height:1;animation:sbbeat .9s ease both}
+@keyframes sbbeat{0%{transform:scale(1.5);opacity:0}35%{transform:scale(1);opacity:1}100%{opacity:.95}}
+.sb-win{font-size:clamp(48px,8vw,120px);font-weight:800;line-height:1;margin:0;opacity:0;transform:scale(.6);transition:opacity .6s ease 2.3s,transform .6s cubic-bezier(.2,1.6,.4,1) 2.3s}
+.sb-final .sb-kicker{opacity:0;transition:opacity .5s ease 2.1s}
+.sb-final.up .sb-win,.sb-final.up .sb-kicker{opacity:1;transform:none}
+.sb-podium{display:flex;align-items:flex-end;justify-content:center;gap:2vw;height:46vh;width:100%;margin-top:1vh}
+.sb-col{flex:0 1 270px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;gap:8px}
+.sb-pname{font-size:clamp(22px,3vw,40px);font-weight:800;opacity:0;transition:opacity .5s ease calc(var(--d) + .8s)}
+.sb-pscore{font-size:clamp(16px,2vw,26px);opacity:0;transition:opacity .5s ease calc(var(--d) + .8s)}
+.sb-block{height:0;background:var(--c);border-radius:14px 14px 0 0;display:grid;place-items:start center;padding-top:10px;font-size:clamp(40px,6vw,88px);font-weight:800;box-shadow:inset 0 -12px 0 rgba(0,0,0,.2);overflow:hidden;transition:height 1s cubic-bezier(.2,.8,.2,1) var(--d)}
+.sb-final.up .sb-block{height:var(--h)}
+.sb-final.up .sb-pname,.sb-final.up .sb-pscore{opacity:1}
+.sb-rest{font-size:18px;opacity:.75;margin:0}
+.sb-confetti{position:absolute;inset:0;pointer-events:none;z-index:2}
 </style>
 </head><body><div id="app"></div>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@2.0.4/dist/qrcode.js"></script>
@@ -792,7 +829,7 @@ function renderControls(c, q) {
     ${q && !isOpenQ ? `<span class="sep"></span><button class="btn" data-act="reveal">${c.reveal === false ? 'חשיפת התוצאות' : 'הסתרת התוצאות'}</button>` : ''}
     <div class="spacer"></div>
     ${B.mode === 'demo' ? `<div class="grp demo-grp"><button class="btn" data-act="sim">הדמיית קהל</button><button class="btn ${H.phone ? 'on' : ''}" data-act="phone">טלפון</button></div><span class="sep"></span>` : ''}
-    <div class="grp"><button class="btn" data-act="bigqr" title="G">QR גדול</button></div>
+    <div class="grp"><button class="btn" data-act="bigqr" title="G">QR גדול</button>${scoreQs().length ? '<button class="btn" data-act="score" title="L">🏆 לוח תוצאות</button>' : ''}</div>
     <div class="grp tools">${tools}</div>
     <details class="tools-menu" ${H.menuOpen ? 'open' : ''}><summary class="btn">כלים</summary><div class="menu">${tools}</div></details>`;
   const dm = $('#h-ctl .tools-menu'); if (dm) dm.addEventListener('toggle', () => { H.menuOpen = dm.open; });
@@ -826,6 +863,7 @@ function hostClick(e) {
   else if (a === 'csv') exportCSV();
   else if (a === 'sim') simulate();
   else if (a === 'bigqr') showBigQR();
+  else if (a === 'score') openScoreboard();
   else if (a === 'phone') togglePhone(!H.phone);
 }
 
@@ -846,8 +884,151 @@ function hostKeys(e) {
   else if ((k === 'c' || k === 'ב') && curQ() && curQ().type === 'open') patchCur({ view: 'cloud' });
   else if ((k === 's' || k === 'ד') && curQ() && curQ().type === 'open') hostClick({ target: Object.assign(document.createElement('b'), { dataset: { act: 'view', v: 'summary' } }) });
   else if (k === 'g' || k === 'ע') showBigQR();
+  else if ((k === 'l' || k === 'L' || k === 'ך') && scoreQs().length) openScoreboard();
   else if (k === 'q' || k === '/') { H.showSide = !H.showSide; LS.set('side', H.showSide); renderHost(); }
   else if (k === 'f' || k === 'כ') hostClick({ target: Object.assign(document.createElement('b'), { dataset: { act: 'fs' } }) });
+}
+
+/* ---------------- scoreboard (team game) ----------------
+   שאלת ניקוד = שאלת בחירה שהמילה "ניקוד" מופיעה בנוסח שלה. כל אפשרות היא קבוצה, וכל קול = נקודה.
+   בונוס ידני לכל קבוצה נשמר באירוע (bonus) ובמחשב המנחה. */
+const TEAM_COLORS = { gpt: '#10A37F', claude: '#D97757', gemini: '#4285F4' };
+const TEAM_FALLBACK = ['#E8505B', '#8E6CEF', '#F2B33D', '#2BB3A6', '#EC6FB0', '#5B8DEF'];
+const scoreQs = () => deck().filter(q => q.type === 'choice' && /ניקוד/.test(q.text || '') && (q.options || []).length >= 2);
+const teamColor = (t, i) => { const k = Object.keys(TEAM_COLORS).find(k => t.toLowerCase().includes(k)); return k ? TEAM_COLORS[k] : TEAM_FALLBACK[i % TEAM_FALLBACK.length]; };
+const teamShort = t => t.replace(/^קבוצת\s+/, '');
+function scoreData() {
+  const qs = scoreQs(), teams = [];
+  qs.forEach(q => q.options.forEach(o => { if (!teams.includes(o)) teams.push(o); }));
+  const rounds = qs.map((q, i) => {
+    const m = q.text.match(/^\s*([^|:]{1,24}?)\s*[|:]/), pts = {}, list = ansFor(q.id);
+    teams.forEach(t => pts[t] = 0); list.forEach(a => { if (a.value in pts) pts[a.value]++; });
+    return { label: m ? m[1].trim() : 'סבב ' + (i + 1), pts, votes: list.length };
+  });
+  return { teams, rounds };
+}
+function countTo(node, to) {
+  const from = +node.dataset.v || 0; node.dataset.v = to;
+  if (from === to || matchMedia('(prefers-reduced-motion: reduce)').matches) { node.textContent = to; return; }
+  const t0 = performance.now(), D = 1000;
+  const f = now => { const k = Math.min(1, (now - t0) / D); node.textContent = Math.round(from + (to - from) * (1 - (1 - k) ** 3)); if (k < 1) requestAnimationFrame(f); };
+  requestAnimationFrame(f);
+}
+function confetti(cv, colors) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return () => { };
+  const ctx = cv.getContext('2d'); let W, Hh, raf, alive = true;
+  const size = () => { W = cv.width = innerWidth; Hh = cv.height = innerHeight; }; size();
+  const P = Array.from({ length: 220 }, () => ({ x: Math.random() * W, y: -Math.random() * Hh, w: 6 + Math.random() * 8, h: 8 + Math.random() * 10, vy: 2 + Math.random() * 4, vx: -1.5 + Math.random() * 3, r: Math.random() * 6, vr: -.15 + Math.random() * .3, c: colors[Math.floor(Math.random() * colors.length)] }));
+  const t0 = performance.now();
+  const f = now => {
+    if (!alive) return; ctx.clearRect(0, 0, W, Hh); const fading = now - t0 > 6000; let any = false;
+    P.forEach(p => { p.y += p.vy; p.x += p.vx + Math.sin((now / 400) + p.r); p.r += p.vr; if (p.y > Hh + 20) { if (fading) return; p.y = -20; p.x = Math.random() * W; } any = true; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore(); });
+    if (any) raf = requestAnimationFrame(f);
+  };
+  raf = requestAnimationFrame(f); addEventListener('resize', size);
+  return () => { alive = false; cancelAnimationFrame(raf); removeEventListener('resize', size); };
+}
+function openScoreboard() {
+  if (!scoreData().rounds.length) { toast('אין שאלות ניקוד. שאלת ניקוד היא שאלת בחירה שהמילה "ניקוד" מופיעה בנוסח שלה.', 5000); return; }
+  if (H.modal) closeModal();
+  H.modal = 'score';
+  const bkey = 'bonus_' + H.code;
+  let bonus = { ...LS.get(bkey, {}), ...((H.room && H.room.bonus) || {}) };
+  let step = 0, timer = null, stopConfetti = () => { };
+  const el = document.createElement('div'); el.className = 'sb'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'לוח התוצאות');
+  document.body.appendChild(el);
+  const steps = () => { const d = scoreData(), s = ['intro']; d.rounds.forEach((_, i) => s.push('r' + i)); if (d.teams.some(t => +bonus[t])) s.push('bonus'); s.push('drum', 'final'); return s; };
+  const totals = (d, upto, withBonus) => { const t = {}; d.teams.forEach(x => t[x] = 0); d.rounds.slice(0, upto).forEach(r => d.teams.forEach(x => t[x] += r.pts[x])); if (withBonus) d.teams.forEach(x => t[x] += (+bonus[x] || 0)); return t; };
+  const ranked = (d, tot) => d.teams.map((t, i) => ({ t, i, s: tot[t] })).sort((a, b) => b.s - a.s || a.i - b.i).map((x, _, arr) => ({ ...x, rank: 1 + arr.filter(y => y.s > x.s).length }));
+  const X = '<button class="sb-x" data-sb="close" aria-label="סגירה">✕</button>';
+  const cleanup = () => { clearInterval(timer); clearTimeout(timer); stopConfetti(); stopConfetti = () => { }; };
+
+  function intro() {
+    const d = scoreData(), votes = d.rounds.reduce((a, r) => a + r.votes, 0);
+    el.innerHTML = X + `<div class="sb-in"><div class="sb-kicker">${esc(H.room.title || '')}</div><h1 class="sb-title">🏆 לוח התוצאות</h1>
+      <p class="sb-sub"><span class="num">${votes}</span> הצבעות נספרו ב-<span class="num">${d.rounds.length}</span> סבבים</p>
+      <div class="sb-bonus"><div class="sb-bl">נקודות בונוס על טעויות שנתפסו (לא חובה)</div>${d.teams.map((t, i) => `<div class="sb-bt" style="--c:${teamColor(t, i)}"><span>${esc(teamShort(t))}</span>
+        <button type="button" data-sb="minus" data-t="${esc(t)}" aria-label="הורדת נקודה">−</button><b class="num">${+bonus[t] || 0}</b><button type="button" data-sb="plus" data-t="${esc(t)}" aria-label="הוספת נקודה">+</button></div>`).join('')}</div>
+      <p class="sb-hint">רווח או לחיצה כדי להתחיל · Esc ליציאה</p></div>`;
+  }
+  function board(kind, i) {
+    const d = scoreData(), isB = kind === 'bonus', upto = isB ? d.rounds.length : i + 1;
+    const tot = totals(d, upto, isB), prev = totals(d, isB ? d.rounds.length : i, false);
+    const rh = Math.min(110, Math.floor((innerHeight * .5) / Math.max(d.teams.length, 1))), gap = 14;
+    let b = $('#sbb', el);
+    if (!b) {
+      el.innerHTML = X + `<div class="sb-in"><div class="sb-kicker" id="sbk"></div><h1 class="sb-title" id="sbt"></h1><div class="sb-board" id="sbb"></div><p class="sb-hint">רווח להמשך · חץ ימינה לחזרה</p></div>`;
+      b = $('#sbb', el);
+      const r0 = ranked(d, prev), mx0 = Math.max(1, ...Object.values(prev));
+      b.style.height = (d.teams.length * (rh + gap)) + 'px';
+      b.innerHTML = d.teams.map((t, ti) => { const pos = r0.findIndex(x => x.t === t); return `<div class="sb-row" data-t="${esc(t)}" style="--c:${teamColor(t, ti)};--rh:${rh}px;top:${pos * (rh + gap)}px">
+        <div class="sb-name">${esc(teamShort(t))}</div><div class="sb-track"><div class="sb-fill" style="width:${prev[t] / mx0 * 100}%"></div></div>
+        <div class="sb-score"><b class="num" data-v="${prev[t]}">${prev[t]}</b><span class="sb-plus"></span></div></div>`; }).join('');
+      void b.offsetWidth;
+    }
+    $('#sbk', el).textContent = isB ? 'בונוס צייד הטעויות' : `${d.rounds[i].label} · ${d.rounds[i].votes} הצבעות`;
+    $('#sbt', el).textContent = isB ? 'אחרי הבונוס' : 'המצב אחרי ' + d.rounds[i].label;
+    const r = ranked(d, tot), mx = Math.max(1, ...Object.values(tot)), lead = r[0] && r[0].s > 0 ? r.filter(x => x.rank === 1).map(x => x.t) : [];
+    requestAnimationFrame(() => r.forEach((x, pos) => {
+      const row = $$('.sb-row', b).find(n => n.dataset.t === x.t); if (!row) return;
+      row.style.top = pos * (rh + gap) + 'px';
+      row.classList.toggle('lead', lead.includes(x.t));
+      $('.sb-fill', row).style.width = (tot[x.t] / mx * 100) + '%';
+      countTo($('.sb-score b', row), tot[x.t]);
+      const p = $('.sb-plus', row), dlt = tot[x.t] - prev[x.t];
+      p.classList.remove('pop'); p.textContent = dlt > 0 ? '+' + dlt : ''; if (dlt > 0) { void p.offsetWidth; p.classList.add('pop'); }
+    }));
+  }
+  function drum() {
+    el.innerHTML = X + `<div class="sb-in"><div class="sb-kicker">ו... המנצחים הם</div><div class="sb-count num" id="sbc">3</div></div>`;
+    let n = 3;
+    timer = setInterval(() => { n--; if (n <= 0) { clearInterval(timer); next(); return; } const c = $('#sbc', el); if (c) { c.textContent = n; c.style.animation = 'none'; void c.offsetWidth; c.style.animation = ''; } }, 900);
+  }
+  function final() {
+    const d = scoreData(), tot = totals(d, d.rounds.length, true), r = ranked(d, tot);
+    const top = r.slice(0, 3), wins = r.filter(x => x.rank === 1), none = !r.length || r[0].s === 0;
+    const H_ = { 1: 72, 2: 52, 3: 36 }, D_ = { 3: 0.2, 2: 0.9, 1: 1.6 };
+    const order = [top[1], top[0], top[2]].filter(Boolean);
+    const winName = none ? 'עוד אין הצבעות' : wins.map(w => '<bdi>' + esc(teamShort(w.t)) + '</bdi>').join(' ו־');
+    el.innerHTML = X + `<div class="sb-in sb-final"><div class="sb-kicker">${none ? '' : wins.length > 1 ? '🤝 תיקו בצמרת!' : '🏆 הקבוצה המנצחת'}</div>
+      <h1 class="sb-win" style="color:${none || wins.length > 1 ? '#FFD84D' : teamColor(wins[0].t, wins[0].i)};text-shadow:0 4px 0 rgba(0,0,0,.25)">${winName}</h1>
+      <div class="sb-podium">${order.map(x => { const k = Math.min(x.rank, 3); return `<div class="sb-col" style="--c:${teamColor(x.t, x.i)};--h:${H_[k]}%;--d:${D_[k]}s">
+        <div class="sb-pname">${esc(teamShort(x.t))}</div><div class="sb-pscore"><span class="num">${x.s}</span> נקודות</div><div class="sb-block num">${x.rank}</div></div>`; }).join('')}</div>
+      ${r.length > 3 ? `<p class="sb-rest">${r.slice(3).map(x => `${x.rank}. ${esc(teamShort(x.t))} (${x.s})`).join(' · ')}</p>` : ''}
+      <p class="sb-hint">Esc לסגירה · חץ ימינה לחזרה</p></div><canvas class="sb-confetti" aria-hidden="true"></canvas>`;
+    const box = $('.sb-final', el); void box.offsetWidth; requestAnimationFrame(() => box.classList.add('up'));
+    if (!none) timer = setTimeout(() => { stopConfetti = confetti($('.sb-confetti', el), [...wins.map(w => teamColor(w.t, w.i)), '#FFD84D', '#FFFFFF', '#FF6FB5']); }, 2300);
+  }
+  function render() {
+    cleanup();
+    const s = steps(); step = Math.max(0, Math.min(step, s.length - 1)); const k = s[step];
+    if (k === 'intro') intro();
+    else if (k === 'bonus') board('bonus');
+    else if (k[0] === 'r') board('round', +k.slice(1));
+    else if (k === 'drum') drum();
+    else final();
+  }
+  function next() { if (step < steps().length - 1) { step++; render(); } }
+  function prev() { if (step > 0) { step--; if (steps()[step] === 'drum') step--; render(); } }
+  function close() { cleanup(); el.remove(); document.removeEventListener('keydown', onK, true); if (H.modal === 'score') H.modal = null; }
+  async function setBonus(t, delta) {
+    bonus = { ...bonus, [t]: Math.max(0, (+bonus[t] || 0) + delta) }; LS.set(bkey, bonus); render();
+    try { await B.saveRoom(H.code, { bonus }); } catch (e) { console.warn('bonus saved locally only', e); }
+  }
+  const onK = e => {
+    const k = e.key;
+    if (k === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(); }
+    else if (k === ' ' || k === 'ArrowLeft' || k === 'PageDown' || k === 'Enter') { e.preventDefault(); e.stopImmediatePropagation(); if (steps()[step] !== 'drum') next(); }
+    else if (k === 'ArrowRight' || k === 'PageUp') { e.preventDefault(); e.stopImmediatePropagation(); prev(); }
+  };
+  el.addEventListener('click', e => {
+    const b = e.target.closest('[data-sb]');
+    if (b) { e.stopPropagation(); const a = b.dataset.sb; if (a === 'close') close(); else if (a === 'plus') setBonus(b.dataset.t, 1); else if (a === 'minus') setBonus(b.dataset.t, -1); return; }
+    if (e.target.closest('.sb-bonus')) return;
+    if (steps()[step] !== 'drum') next();
+  });
+  document.addEventListener('keydown', onK, true);
+  render();
 }
 
 /* ---------------- modals ---------------- */
