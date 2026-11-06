@@ -648,32 +648,32 @@ function buildAll(){
 function makeLabel(r){
   const c=document.createElement('canvas'),g=c.getContext('2d'); const scale=2;
   const fontA=`600 ${15*scale}px "IBM Plex Sans Hebrew",Arial`, fontB=`500 ${12*scale}px "IBM Plex Mono",monospace`;
-  g.font=fontA; let w=g.measureText(r.name).width; g.font=fontB; const line2=r.tag!=='-'?(r.tag+(r.printed?`  ·  ${r.printed.toFixed(2)} m²`:'')):''; w=Math.max(w,g.measureText(line2).width);
-  g.font=fontA; w=Math.max(w,g.measureText(owners[r.id]||'').width); c.width=Math.ceil(w)+20*scale; const who=owners[r.id]||''; c.height=((r.tag!=='-'?56:32)+(who?22:0))*scale;
+  const title=owners[r.id]||r.name; g.font=fontA; let w=g.measureText(title).width; g.font=fontB; const line2=r.tag!=='-'?(r.tag+(r.printed?`  ·  ${r.printed.toFixed(2)} m²`:'')):''; w=Math.max(w,g.measureText(line2).width);
+  c.width=Math.ceil(w)+20*scale; c.height=(r.tag!=='-'?56:32)*scale;
   g.font=fontA; g.textAlign='center'; g.textBaseline='middle';
   g.fillStyle='rgba(238,240,236,.92)'; g.fillRect(0,0,c.width,c.height);
   g.fillStyle='#1b2a3a'; g.direction='rtl';
-  g.fillText(r.name,c.width/2,(r.tag!=='-'?18:16)*scale);
+  g.fillText(title,c.width/2,(r.tag!=='-'?18:16)*scale);
   if(r.tag!=='-'){ g.direction='ltr'; g.font=fontB; g.fillStyle='#2547a8';
     g.fillText(line2,c.width/2,40*scale); }
-  if(who){ g.direction='rtl'; g.font=fontA; g.fillStyle='#c43f35'; g.fillText(who,c.width/2,((r.tag!=='-'?56:32)+9)*scale); }
   const t=new THREE.CanvasTexture(c); t.minFilter=THREE.LinearFilter;
   const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,depthTest:false,transparent:true,sizeAttenuation:false}));
   s.renderOrder=20; const q=r.rects.slice().sort((a,b)=>(b[1]-b[0])*(b[3]-b[2])-(a[1]-a[0])*(a[3]-a[2]))[0];
   if(r.labelAt) s.position.set(r.labelAt[0]/100,1.7,r.labelAt[1]/100); else s.position.set((q[0]+q[1])/200,1.7,(q[2]+q[3])/200);
   s.userData={aspect:c.width/c.height,h:c.height/scale}; return s;
 }
-function buildLabels(){ while(labels.children.length) labels.remove(labels.children[0]); PLAN.rooms.forEach(r=>labels.add(makeLabel(r))); buildPlates(); }
+function fillRooms(){ const sel=$('rooms'), v=sel.value; sel.innerHTML=''; PLAN.rooms.forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=(r.tag!=='-'?r.tag+' ':'')+(owners[r.id]||r.name); sel.appendChild(o); }); if(v) sel.value=v; }
+function buildLabels(){ while(labels.children.length) labels.remove(labels.children[0]); PLAN.rooms.forEach(r=>labels.add(makeLabel(r))); buildPlates(); fillRooms(); }
 function buildPlates(){
   while(plateGroup.children.length) plateGroup.remove(plateGroup.children[0]);
   PLAN.rooms.filter(r=>r.plate).forEach(r=>{
     const who=owners[r.id]||'', c=document.createElement('canvas'), g=c.getContext('2d'), sc=3;
-    const line1=r.tag!=='-'?r.tag:r.name, f1=`500 ${12*sc}px "IBM Plex Mono",monospace`, f2=`600 ${16*sc}px "IBM Plex Sans Hebrew",Arial`;
+    const line1=r.tag!=='-'?r.tag:'', f1=`500 ${12*sc}px "IBM Plex Mono",monospace`, f2=`600 ${16*sc}px "IBM Plex Sans Hebrew",Arial`;
     g.font=f2; let w=Math.max(g.measureText(who||r.name).width,50*sc);
     c.width=Math.ceil(w)+20*sc; c.height=52*sc;
     g.fillStyle='#fbfbf8'; g.fillRect(0,0,c.width,c.height); g.strokeStyle='#1b2a3a'; g.lineWidth=sc; g.strokeRect(sc/2,sc/2,c.width-sc,c.height-sc);
     g.textAlign='center'; g.textBaseline='middle'; g.font=f1; g.fillStyle='#2547a8'; g.fillText(line1,c.width/2,15*sc);
-    g.font=f2; g.direction='rtl'; g.fillStyle=who?'#c43f35':'#1b2a3a'; g.fillText(who||r.name,c.width/2,35*sc);
+    g.font=f2; g.direction='rtl'; g.fillStyle='#1b2a3a'; g.fillText(who||r.name,c.width/2,line1?35*sc:26*sc);
     const t=new THREE.CanvasTexture(c); t.minFilter=THREE.LinearFilter;
     const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,clippingPlanes:[camPlane]}));
     const h=.15; sp.scale.set(h*c.width/c.height,h,1); sp.position.set(r.plate[0]/100,1.85,r.plate[1]/100); sp.renderOrder=5; plateGroup.add(sp);
@@ -930,7 +930,7 @@ function updateWhere(){
   $('whereTag').textContent=r?(r.tag==='-'?'·':r.tag):'·';
   if(r) $('rooms').value=r.id;
   $('whereArea').innerHTML=r&&r.printed?`<span class="mono">${r.printed.toFixed(2)}</span> מ"ר`:'';
-  const canOwn=r&&r.plate; $('whereOwner').textContent=canOwn?(owners[r.id]||''):''; $('ownBtn').hidden=!canOwn; $('ownBtn').textContent=canOwn&&owners[r.id]?'שינוי':'של מי?';
+  const canOwn=r&&r.plate; $('whereOwner').textContent=''; $('ownBtn').hidden=!canOwn; $('ownBtn').textContent=canOwn&&owners[r.id]?'שינוי':'של מי?';
 }
 function teleport(x,z){ if(hitsWall(x,z)){ // find a nearby free spot
     for(let d=.1;d<2;d+=.1){ for(let a=0;a<6.28;a+=.52){ const nx=x+Math.cos(a)*d,nz=z+Math.sin(a)*d; if(!hitsWall(nx,nz)){ player.x=nx;player.z=nz; return; } } } }
@@ -1201,7 +1201,7 @@ mapC.addEventListener('pointerdown',e=>{ const r=mapC.getBoundingClientRect(),{s
 
 /* ===================== UI wiring ===================== */
 CATALOG.forEach((c,n)=>{ const b=document.createElement('button'); b.innerHTML=`<span>${c.name} <small style="display:inline">[${(n+1)%10}]</small></span><small>${c.w}×${c.d}×${c.h}</small>`; b.onclick=()=>addItem(c); $('cat').appendChild(b); });
-PLAN.rooms.forEach(r=>{ const o=document.createElement('option'); o.value=r.id; o.textContent=(r.tag!=='-'?r.tag+' ':'')+r.name; $('rooms').appendChild(o); });
+
 $('rooms').onchange=e=>{ const r=PLAN.rooms.find(q=>q.id===e.target.value); if(!r) return; const q=r.rects.slice().sort((a,b)=>(b[1]-b[0])*(b[3]-b[2])-(a[1]-a[0])*(a[3]-a[2]))[0];
   teleport((q[0]+q[1])/200,(q[2]+q[3])/200); lastRoom=undefined; if(mode!=='walk'){ mode='walk'; applyMode(); } e.target.blur(); };
 $('mWalk').onclick=()=>{mode='walk';applyMode();}; $('mModel').onclick=()=>{mode='model';applyMode();}; $('mPlan').onclick=()=>{mode='plan';applyMode();};
