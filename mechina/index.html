@@ -14,7 +14,7 @@
 /* Layout: a full-bleed 3D view with drafting-sheet panels floating on it; room tags echo the blue ellipses on the plan. */
 :root{
   --paper:#eef0ec; --paper2:#e2e5e0; --ink:#1b2a3a; --ink2:#566473; --line:#b9c0bd;
-  --dim:#2547a8; --tag:#c43f35; --sky:#cfdde8;
+  --dim:#2547a8; --tag:#c43f35; --sky:#cfdde8; --amber:#e0a020; --new:#2f9e5a;
   --sans:"IBM Plex Sans Hebrew","Segoe UI",Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
   color-scheme:light;
 }
@@ -45,6 +45,9 @@ button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid 
 #panel{position:absolute;top:calc(62px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));width:270px;max-height:calc(100% - 82px);overflow:auto;padding:12px;display:grid;gap:12px}
 #panel[hidden]{display:none}
 #panel h2{margin:0;font-size:13px;font-weight:700}
+#panel{overflow-x:hidden}
+#panel>*,#propList>*,#propBox,#wallTools,#wallSel{min-width:0}
+#propList{grid-template-columns:minmax(0,1fr)}
 .hint{margin:0;color:var(--ink2);font-size:12.5px}
 #cat{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 #cat button{text-align:right;display:grid;gap:0;padding:6px 8px}
@@ -98,6 +101,22 @@ th{font-weight:600;color:var(--ink2)}
 #sMsg{min-height:1.4em;font-size:12.5px;color:var(--dim)}
 #incoming{position:absolute;top:calc(112px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);padding:12px;display:grid;gap:8px;z-index:4;width:min(440px,calc(100% - 32px));box-sizing:border-box}
 #incoming p{margin:0;font-weight:600}
+#draftBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(240px + env(safe-area-inset-left,0px));width:min(600px,calc(100% - 560px));min-width:min(420px,calc(100% - 20px));box-sizing:border-box;padding:8px 12px;display:grid;gap:6px;z-index:3;border:2px solid var(--amber)}
+#draftBar .t{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+#draftBar b{font-size:14px} #draftBar .note{font-size:12px;color:var(--ink2)}
+#draftDiff{font-size:12.5px;color:var(--ink)} #draftDiff span{white-space:nowrap}
+#draftBar .row button{flex:0 1 auto;min-height:30px;padding:3px 10px;font-size:13px}
+#wPick[aria-pressed=true]{background:var(--dim);color:#fff;border-color:var(--dim)}
+#dCompare[aria-pressed=true]{background:var(--amber);border-color:var(--amber);color:#1b2a3a}
+#app.drafting #help{display:none}
+#app.drafting #toast{bottom:calc(190px + env(safe-area-inset-bottom,0px))}
+#app.drafting::after{content:"";position:absolute;inset:0;border:4px solid var(--amber);pointer-events:none;z-index:2}
+#propList{display:grid;gap:5px;margin-top:8px}
+#propList .p{display:flex;gap:6px;align-items:center;justify-content:space-between;font-size:12.5px}
+#propList .p span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#propList .p button{min-height:28px;padding:2px 8px;font-size:12px;flex:none}
+.lg{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-inline-end:3px}
+@media (max-width:900px){ #draftBar{left:calc(10px + env(safe-area-inset-left,0px));width:calc(100% - 20px);min-width:0} #app.drafting #mapbox{display:none} }
 #joy{position:absolute;bottom:calc(24px + env(safe-area-inset-bottom,0px));left:calc(24px + env(safe-area-inset-left,0px));width:120px;height:120px;border-radius:50%;background:rgba(238,240,236,.45);border:1px solid var(--line);pointer-events:none;display:none}
 #joy i{position:absolute;left:40px;top:40px;width:40px;height:40px;border-radius:50%;background:var(--ink);opacity:.7}
 #cross{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;pointer-events:none}
@@ -192,6 +211,21 @@ th{font-weight:600;color:var(--ink2)}
       <input type="range" id="sens" min="0.0008" max="0.005" step="0.0002">
       <label class="chk" style="justify-content:flex-start"><input type="checkbox" id="fullWalls">קירות מלאים במודל</label>
     </div>
+    <details id="propBox" open><summary>הצעות לשינוי</summary>
+      <p class="hint" style="margin-top:6px">הצעה היא עותק לניסיון. כל מה שתזיזו בה לא משנה את הסידור המקורי, עד שתבחרו להחיל אותה.</p>
+      <div class="row" style="margin-top:6px"><input type="text" id="pName" aria-label="שם ההצעה" placeholder="שם ההצעה" style="flex:1;min-width:0"><button id="pNew">התחלת הצעה</button></div>
+      <div id="propList"></div>
+      <div id="wallTools" hidden style="display:grid;gap:6px;border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
+        <h2>קירות בהצעה</h2>
+        <p class="hint">את הקירות אפשר לשנות רק בתוך הצעה, כך שהמקור נשאר כמו שהוא.</p>
+        <div class="row"><button id="wPick" aria-pressed="false">בחירת קיר</button></div>
+        <div id="wallSel" hidden style="display:grid;gap:6px">
+          <p class="hint" id="wsInfo"></p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button id="wsM60"></button><button id="wsP60"></button><button id="wsM10"></button><button id="wsP10"></button></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button id="wsRm" class="danger">הסרת הקיר</button><button id="wsReset">החזרה למקור</button></div>
+        </div>
+      </div>
+    </details>
     <details id="ownBox"><summary>של מי החדר</summary><div id="owners"></div></details>
     <div class="row" id="clearRow" hidden>
       <button id="pinAll">נעילת כל הפריטים</button>
@@ -230,6 +264,7 @@ th{font-weight:600;color:var(--ink2)}
         <li><b>קירות מעוקלים:</b> בצילום הקירות נראים מעוקלים בגלל קפלי הנייר, ובחרתי לבנות אותם ישרים. אם המבנה באמת מעוקל, זה משנה את החזיתות ואת הדמיית המסדרונות.</li>
         <li><b>שני החדרים הפנימיים</b> ב-416 וב-417 ללא תווית בתוכנית. מידותיהם הועתקו מ-415.1.</li>
         <li><b>חלונות שתוסיפו:</b> אפשר לשים חלון בכל קיר שתבחרו, גם בקיר שנראה תומך. קיר דק (7 ס"מ) מסומן בכחול וקיר עבה בכתום. הסימון נקרא מהשרטוט, אינו מלמד על תשתיות בתוך הקיר ואינו אישור הנדסי, ולכן לפני ביצוע צריך לבדוק מול מהנדס הקונסטרוקציה.</li>
+        <li><b>הצעות:</b> הצעה נשמרת בנפרד מהסידור המקורי. בדף המשותף היא נשמרת לכל מי שיכול לערוך, ובאתר הציבורי רק במכשיר של מי שיצר אותה, ועוברת הלאה בקישור.</li>
         <li><b>מצלמת הדמות:</b> נשארת במרחק קבוע של 2.6 מ'. קיר או תקרה שמסתירים את הדמות נחתכים מהתצוגה בלבד, בלי שינוי במבנה.</li>
         <li><b>השמטות:</b> לא הוכנסו ריהוט, כלים סניטריים, מעקות ועיבוי החזית. הצבעים אינם לפי מפרט גמרים.</li>
       </ul>
@@ -246,14 +281,25 @@ th{font-weight:600;color:var(--ink2)}
       <h3>קיבלתם סידור בחזרה?</h3>
       <label for="sIn" class="hint">הדביקו כאן את הקישור שקיבלתם:</label>
       <textarea id="sIn"></textarea>
-      <div class="row"><button id="sMerge">הוספה לסידור שלי</button><button id="sReplace" class="danger">החלפת הסידור שלי</button></div>
+      <div class="row"><button id="sDraft">פתיחה כהצעה</button><button id="sMerge">הוספה לסידור שלי</button><button id="sReplace" class="danger">החלפת הסידור שלי</button></div>
       <div id="sMsg" role="status"></div>
       <div class="row"><button id="sClose">סגירה</button></div>
     </div>
   </div>
+  <div id="draftBar" class="sheet" hidden role="region" aria-label="מצב הצעה">
+    <div class="t"><b id="dName"></b><span class="note">מצב הצעה: המקור לא משתנה</span></div>
+    <div id="draftDiff"></div>
+    <div class="row">
+      <button id="dCompare" aria-pressed="false">השוואה למקור</button>
+      <button id="dSend">שליחת ההצעה</button>
+      <button id="dApply">החלה על המקור</button>
+      <button id="dExit">חזרה למקור</button>
+      <button id="dDel" class="danger">מחיקת ההצעה</button>
+    </div>
+  </div>
   <div id="incoming" class="sheet" hidden>
     <p>קיבלתם סידור בקישור</p>
-    <div class="row"><button id="inMerge">הוספה לסידור שלי</button><button id="inReplace">פתיחה במקום הסידור שלי</button><button id="inSkip">התעלמות</button></div>
+    <div class="row"><button id="inDraft">פתיחה כהצעה (המקור לא ישתנה)</button><button id="inMerge">הוספה לסידור שלי</button><button id="inReplace">פתיחה במקום הסידור שלי</button><button id="inSkip">התעלמות</button></div>
   </div>
   <div id="err" class="sheet" hidden>התצוגה התלת-ממדית לא נטענה בדפדפן הזה. נסו דפדפן אחר, או רעננו את הדף.</div>
 </div>
@@ -384,7 +430,22 @@ const PLAN = (() => {
 /* Expanded floor rectangles including small extras */
 PLAN.rooms.forEach(r=>{ r.floors = r.rects.concat(r.extra||[]); r.area = r.rects.reduce((s,q)=>s+(q[1]-q[0])*(q[3]-q[2]),0)/1e4; });
 
-const wallKey=w=>[w.x1,w.x2,w.y1,w.y2].join(',');
+const wallKey=w=>w.key||[w.x1,w.x2,w.y1,w.y2].join(',');
+PLAN.walls.forEach(w=>{ w.key=[w.x1,w.x2,w.y1,w.y2].join(','); });
+PLAN.rooms.forEach(r=>{ r.base={rects:r.rects,floors:r.floors,area:r.area}; });
+const PLAN_KEYS=new Set(PLAN.walls.map(w=>w.key));
+let wallEdits={edits:{},add:[]}, roomEdits={}, WALLS=PLAN.walls.slice();
+function applyStructure(){ lastRoom=undefined;
+  WALLS=[];
+  PLAN.walls.forEach(w=>{ const e=wallEdits.edits[w.key]; if(e&&e.rm) return;
+    if(e&&e.d){ const hz=(w.x2-w.x1)>(w.y2-w.y1); WALLS.push(hz?{...w,y1:w.y1+e.d,y2:w.y2+e.d}:{...w,x1:w.x1+e.d,x2:w.x2+e.d}); }
+    else WALLS.push(w); });
+  (wallEdits.add||[]).forEach(a=>WALLS.push({x1:a.x1,x2:a.x2,y1:a.y1,y2:a.y2,open:[],mat:'wall',h:a.h,key:'n:'+a.id,added:true}));
+  PLAN.rooms.forEach(r=>{ const o=roomEdits[r.id];
+    if(o&&o.rects){ r.rects=o.rects; r.floors=o.rects.concat(r.extra||[]); r.area=o.rects.reduce((t,q)=>t+(q[1]-q[0])*(q[3]-q[2]),0)/1e4; r.changed=true; }
+    else { r.rects=r.base.rects; r.floors=r.base.floors; r.area=r.base.area; r.changed=false; }
+    r.plateHidden=!!(o&&o.noPlate); });
+}
 const canHoldWindow=w=>{ const hz=(w.x2-w.x1)>(w.y2-w.y1), th=hz?w.y2-w.y1:w.x2-w.x1, len=hz?w.x2-w.x1:w.y2-w.y1;
   return !w.h&&w.mat==='wall'&&len>=100; };
 const isThick=w=>Math.min(w.x2-w.x1,w.y2-w.y1)>8;
@@ -517,7 +578,7 @@ function buildAll(){
   };
   const addCol=(x1,x2,z1,z2)=>colliders.push({x1,x2,z1,z2});
 
-  PLAN.walls.forEach(w=>{
+  WALLS.forEach(w=>{
     const x1=w.x1/100,x2=w.x2/100,z1=w.y1/100,z2=w.y2/100;
     const horiz=(x2-x1)>(z2-z1);
     const height=w.h?Math.min(w.h/100,H):H;
@@ -648,7 +709,7 @@ function buildAll(){
 function makeLabel(r){
   const c=document.createElement('canvas'),g=c.getContext('2d'); const scale=2;
   const fontA=`600 ${15*scale}px "IBM Plex Sans Hebrew",Arial`, fontB=`500 ${12*scale}px "IBM Plex Mono",monospace`;
-  const title=owners[r.id]||r.name; g.font=fontA; let w=g.measureText(title).width; g.font=fontB; const line2=r.tag!=='-'?(r.tag+(r.printed?`  ·  ${r.printed.toFixed(2)} m²`:'')):''; w=Math.max(w,g.measureText(line2).width);
+  const title=owners[r.id]||r.name; g.font=fontA; let w=g.measureText(title).width; g.font=fontB; const line2=r.tag!=='-'?(r.tag+(r.changed?`  ·  ~${r.area.toFixed(2)} m²`:r.printed?`  ·  ${r.printed.toFixed(2)} m²`:'')):''; w=Math.max(w,g.measureText(line2).width);
   c.width=Math.ceil(w)+20*scale; c.height=(r.tag!=='-'?56:32)*scale;
   g.font=fontA; g.textAlign='center'; g.textBaseline='middle';
   g.fillStyle='rgba(238,240,236,.92)'; g.fillRect(0,0,c.width,c.height);
@@ -666,7 +727,7 @@ function fillRooms(){ const sel=$('rooms'), v=sel.value; sel.innerHTML=''; PLAN.
 function buildLabels(){ while(labels.children.length) labels.remove(labels.children[0]); PLAN.rooms.forEach(r=>labels.add(makeLabel(r))); buildPlates(); fillRooms(); }
 function buildPlates(){
   while(plateGroup.children.length) plateGroup.remove(plateGroup.children[0]);
-  PLAN.rooms.filter(r=>r.plate).forEach(r=>{
+  PLAN.rooms.filter(r=>r.plate&&!r.plateHidden).forEach(r=>{
     const who=owners[r.id]||'', c=document.createElement('canvas'), g=c.getContext('2d'), sc=3;
     const line1=r.tag!=='-'?r.tag:'', f1=`500 ${12*sc}px "IBM Plex Mono",monospace`, f2=`600 ${16*sc}px "IBM Plex Sans Hebrew",Arial`;
     g.font=f2; let w=Math.max(g.measureText(who||r.name).width,50*sc);
@@ -800,7 +861,7 @@ function buildItemMesh(it){
 }
 const outline=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1,1,1)),new THREE.LineBasicMaterial({color:0xc43f35,depthTest:false,transparent:true}));
 outline.renderOrder=30; outline.visible=false; scene.add(outline);
-function syncItems(){
+function syncItems(){ setTimeout(()=>{ if(draft) updateDiff(); },0);
   while(itemsGroup.children.length){ itemsGroup.remove(itemsGroup.children[0]); }
   items.forEach(it=>itemsGroup.add(buildItemMesh(it)));
   updateSelUI();
@@ -811,7 +872,7 @@ function itemAABB(it){ const a=(it.rot||0)*Math.PI/180,c=Math.abs(Math.cos(a)),s
 function updateOutline(){
   const it=items.find(i=>i.id===selected);
   const uw=windows.find(u=>u.id===selWin);
-  if(uw){ const w=PLAN.walls.find(q=>wallKey(q)===uw.wall); if(w){ const hz=(w.x2-w.x1)>(w.y2-w.y1), H=(uw.head-uw.sill)/100, L=(uw.b-uw.a)/100, c=(uw.a+uw.b)/200;
+  if(uw){ const w=WALLS.find(q=>wallKey(q)===uw.wall); if(w){ const hz=(w.x2-w.x1)>(w.y2-w.y1), H=(uw.head-uw.sill)/100, L=(uw.b-uw.a)/100, c=(uw.a+uw.b)/200;
       outline.visible=true; outline.rotation.y=0; outline.scale.set(hz?L:.1,H,hz?.1:L);
       outline.position.set(hz?c:(w.x1+w.x2)/200,(uw.sill+uw.head)/200,hz?(w.y1+w.y2)/200:c); outline.material.color.setHex(0x2547a8); return; } }
   if(!it){ outline.visible=false; return; }
@@ -836,7 +897,7 @@ function updateSelUI(){
   const uw=windows.find(u=>u.id===selWin); $('winSel').hidden=!uw;
   if(uw){ const f=(id,v)=>{ if(document.activeElement!==$(id)) $(id).value=Math.round(v); }; f('wW',uw.b-uw.a); f('wS',uw.sill); f('wH',uw.head-uw.sill); }
   if(it) $('rowHint').hidden=it.type!=='pcrow';
-  if(uw){ const w=PLAN.walls.find(q=>wallKey(q)===uw.wall); $('wWarn').hidden=!(w&&isThick(w)); ['wW','wS','wH','wDel'].forEach(k=>$(k).disabled=!!uw.pin); $('wPin').textContent=uw.pin?'פתיחת הנעילה':'נעילה'; $('wHint').textContent=uw.pin?'החלון נעול, פתחו את הנעילה כדי לשנות אותו.':'גררו את החלון על הקיר כדי להזיז אותו.'; }
+  if(uw){ const w=WALLS.find(q=>wallKey(q)===uw.wall); $('wWarn').hidden=!(w&&isThick(w)); ['wW','wS','wH','wDel'].forEach(k=>$(k).disabled=!!uw.pin); $('wPin').textContent=uw.pin?'פתיחת הנעילה':'נעילה'; $('wHint').textContent=uw.pin?'החלון נעול, פתחו את הנעילה כדי לשנות אותו.':'גררו את החלון על הקיר כדי להזיז אותו.'; }
   if(it){ const on=!!it.pin; ['iW','iD','iH','rotL','rotR','rot90','del'].forEach(k=>$(k).disabled=on); $('pin').textContent=on?'🔒 פתיחת הנעילה':'נעילת הפריט'; }
   const allPin=items.length>0&&items.every(i=>i.pin); $('pinAll').textContent=allPin?'פתיחת כל הפריטים':'נעילת כל הפריטים';
   $('emptyHint').hidden=items.length>0;
@@ -849,7 +910,7 @@ function updateSelUI(){
   $('gaps').innerHTML=`<div><span>למעלה בתוכנית</span><span class="mono">${fmt(g.n)}</span></div><div><span>למטה</span><span class="mono">${fmt(g.s)}</span></div><div><span>ימינה</span><span class="mono">${fmt(g.e)}</span></div><div><span>שמאלה</span><span class="mono">${fmt(g.w)}</span></div>`;
 }
 function select(id){ selected=id; if(id) selWin=null; updateSelUI(); if(id&&!locked&&$('panel').hidden&&!matchMedia('(max-width:720px),(pointer:coarse)').matches) setPanel(true); }
-function refreshItem(it){ const old=meshOf(it.id); if(old) itemsGroup.remove(old); itemsGroup.add(buildItemMesh(it)); updateSelUI(); }
+function refreshItem(it){ if(draft) setTimeout(updateDiff,0); const old=meshOf(it.id); if(old) itemsGroup.remove(old); itemsGroup.add(buildItemMesh(it)); updateSelUI(); }
 function addItem(c){
   const it={id:'i'+Date.now().toString(36)+Math.floor(Math.random()*1e4),type:c.type,name:c.name,w:c.w,d:c.d,h:c.h,base:c.base||0,rot:0,x:0,z:0};
   if(mode==='walk'){ const fx=Math.sin(yaw),fz=-Math.cos(yaw); it.x=snap(player.x+fx*1.8); it.z=snap(player.z+fz*1.8); if(hitsWall(it.x,it.z,.1)){ it.x=snap(player.x+fx*.9); it.z=snap(player.z+fz*.9);} }
@@ -862,15 +923,152 @@ const snap=v=>Math.round(v*20)/20;
 
 /* ===================== Saving ===================== */
 const BAKED={"ceil":2.7,"items":[{"base":0,"d":80,"h":75,"id":"imw42igl07475","name":"שולחן מרצה","pin":true,"rot":270,"type":"desk","w":400,"x":8.9,"z":3.05},{"base":0,"d":50,"h":85,"id":"imw42lkts1898","name":"כיסא","rot":270,"type":"chair","w":50,"x":8.25,"z":3.9},{"base":0,"d":50,"h":85,"id":"imw42lr1v","name":"כיסא","pin":true,"rot":90,"type":"chair","w":50,"x":9.15,"z":3.35},{"base":0,"d":50,"h":85,"id":"imw42lrux","name":"כיסא","pin":true,"rot":90,"type":"chair","w":50,"x":9.15,"z":3.95},{"base":0,"d":50,"h":85,"id":"imw42lsbk","name":"כיסא","pin":true,"rot":90,"type":"chair","w":50,"x":9.15,"z":2.8},{"base":0,"d":50,"h":85,"id":"imw42lsv9","name":"כיסא","pin":true,"rot":90,"type":"chair","w":50,"x":9.15,"z":4.6},{"base":0,"d":50,"h":85,"id":"imw441t386235","name":"כיסא","rot":90,"type":"chair","w":50,"x":9.15,"z":2.2},{"base":0,"d":50,"h":85,"id":"imw441u9i2724","name":"כיסא","rot":0,"type":"chair","w":50,"x":8.8,"z":3.5}],"owners":{"400":"חדר מרצי חוץ","401":"חדר ישיבות","402":"אורית וסוניה","403":"רחלי","415":"אילן","416":"סיגלית","417":"רונן, ניסים","415.1":"עוזי","416i":"ויקטור","417i":"ראובן, גילי"},"windows":[{"a":90,"b":210,"head":210,"id":"wmw444dox","pin":true,"sill":90,"wall":"275,282,0,381"}]};
+/* ===================== Proposals ===================== */
+const LSP='mechina-proposals-v1', LSD='mechina-draft-open';
+let draft=null, origState=null, props={}, propCol=null, comparing=false, draftT=null;
+const clone=o=>JSON.parse(JSON.stringify(o));
+function cleanProp(id,v){ const st=cleanState(v.state||{}); return {id:String(id).slice(0,40),name:String(v.name||'הצעה').slice(0,80),state:st,base:v.base?cleanState(v.base):null,created:+v.created||Date.now(),updated:+v.updated||0}; }
+function loadProps(){ try{ const o=JSON.parse(localStorage.getItem(LSP)||'{}'); Object.keys(o).forEach(k=>{ props[k]=cleanProp(k,o[k]); }); }catch(e){} renderProps(); }
+function storeProps(){ try{ localStorage.setItem(LSP,JSON.stringify(props)); }catch(e){} }
+function saveDraft(){
+  clearTimeout(draftT);
+  draftT=setTimeout(async()=>{
+    if(!draft) return; draft.state=clone(state()); draft.updated=Date.now(); props[draft.id]=draft; storeProps(); renderProps(); updateDiff();
+    if(propCol){ try{ await propCol.doc(draft.id).set({name:draft.name,state:draft.state,base:draft.base,created:draft.created,updated:draft.updated}); setStatus('נשמר בהצעה. המקור לא השתנה.'); }catch(e){ setStatus('ההצעה נשמרה אצלכם בלבד. המקור לא השתנה.'); } }
+    else setStatus('ההצעה נשמרה אצלכם בלבד. המקור לא השתנה.');
+  },400);
+}
+function draftUI(){
+  const on=!!draft; $('wallTools').hidden=!on; if(!on){ wallPick=false; selWall=null; $('wPick').setAttribute('aria-pressed','false'); hlGroup.visible=false; updateWallUI(); } $('draftBar').hidden=!on; $('app').classList.toggle('drafting',on);
+  if(on) $('dName').textContent='הצעה: '+draft.name;
+  if(!on){ comparing=false; $('dCompare').setAttribute('aria-pressed','false'); }
+  resetArm(); updateDiff();
+}
+function startDraft(name,fromState){
+  if(draft) flushDraft();
+  if(!draft) origState=clone(state());
+  const id='p'+Date.now().toString(36)+Math.floor(Math.random()*1e4);
+  draft={id,name:(name||'').trim()||('הצעה '+new Date().toLocaleDateString('he-IL')),state:clone(fromState||state()),base:clone(origState),created:Date.now(),updated:Date.now()};
+  props[id]=draft; try{ localStorage.setItem(LSD,id); }catch(e){}
+  if(fromState) applyState(fromState);
+  fillOwners(); lastRoom=undefined; draftUI(); saveDraft(); renderProps();
+  toast('נפתחה הצעה. שינויים כאן לא משנים את המקור.');
+}
+function openDraft(p,silent){
+  if(draft&&draft.id===p.id) return;
+  if(draft) flushDraft(); else origState=clone(state());
+  draft=p; try{ localStorage.setItem(LSD,p.id); }catch(e){}
+  selected=null; selWin=null; applyState(p.state); fillOwners(); lastRoom=undefined; draftUI(); renderProps();
+  if(!silent) toast('נפתחה ההצעה "'+p.name+'"');
+}
+function flushDraft(){ if(!draft) return; clearTimeout(draftT); draft.state=clone(state()); draft.updated=Date.now(); props[draft.id]=draft; storeProps();
+  if(propCol) propCol.doc(draft.id).set({name:draft.name,state:draft.state,base:draft.base,created:draft.created,updated:draft.updated}).catch(()=>{}); }
+function exitDraft(){ if(!draft) return; flushDraft(); draft=null; try{ localStorage.removeItem(LSD); }catch(e){}
+  selected=null; selWin=null; applyState(origState); fillOwners(); lastRoom=undefined; draftUI(); renderProps(); setStatus(docRef?'שינויים נשמרים לכל מי שפותח את הדף':NOSHARE); toast('חזרתם לסידור המקורי'); }
+function removeProp(id){ delete props[id]; storeProps(); if(propCol) propCol.doc(id).delete().catch(()=>{}); renderProps(); }
+function applyDraft(){ const st=clone(state()), id=draft.id; clearTimeout(draftT); draft=null; try{ localStorage.removeItem(LSD); }catch(e){}
+  removeProp(id); draftUI(); savedJSON=''; applyState(st); save(); toast('ההצעה הוחלה על הסידור המקורי'); }
+function deleteDraft(){ const id=draft.id; clearTimeout(draftT); draft=null; try{ localStorage.removeItem(LSD); }catch(e){}
+  removeProp(id); selected=null; selWin=null; applyState(origState); fillOwners(); lastRoom=undefined; draftUI(); toast('ההצעה נמחקה. הסידור המקורי לא השתנה.'); }
+function renderProps(){ const box=$('propList'); if(!box) return; box.innerHTML='';
+  Object.values(props).sort((a,b)=>(b.updated||0)-(a.updated||0)).forEach(p=>{
+    const row=document.createElement('div'); row.className='p'; const t=document.createElement('span');
+    const d=new Date(p.updated||p.created); t.textContent=p.name+'  ·  '+d.toLocaleDateString('he-IL',{day:'numeric',month:'numeric'});
+    const b=document.createElement('button'); const cur=draft&&draft.id===p.id; b.textContent=cur?'פתוחה עכשיו':'פתיחה'; b.disabled=cur;
+    b.onclick=()=>openDraft(props[p.id]); row.append(t,b); box.appendChild(row); });
+  if(!Object.keys(props).length){ const e=document.createElement('p'); e.className='hint'; e.textContent='אין עדיין הצעות שמורות.'; box.appendChild(e); }
+}
+/* wall editing inside a proposal */
+let wallPick=false, selWall=null;
+const selWallMesh=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshBasicMaterial({color:0x2547a8,transparent:true,opacity:.35,depthWrite:false})); selWallMesh.visible=false; scene.add(selWallMesh);
+function aimAnyWall(){ const d=ray.ray.direction, o=ray.ray.origin.clone().addScaledVector(d,rayMinT()), top=(mode==='walk'||$('fullWalls').checked&&mode==='model')?CEIL:SECT;
+  let best=1e9; colliders.forEach(c=>{ const t=slab3(o,d,c,top); if(t!==null&&t<best) best=t; }); if(best>=1e9) return null;
+  const x=(o.x+d.x*(best+.005))*100, y=(o.z+d.z*(best+.005))*100;
+  return WALLS.find(q=>x>=q.x1-.5&&x<=q.x2+.5&&y>=q.y1-.5&&y<=q.y2+.5)||null; }
+function showWallBox(mesh,w){ if(!w){ mesh.visible=false; return; } mesh.visible=true; const H=(w.h?Math.min(w.h/100,CEIL):CEIL);
+  mesh.scale.set((w.x2-w.x1)/100+.04,H+.02,(w.y2-w.y1)/100+.04); mesh.position.set((w.x1+w.x2)/200,H/2,(w.y1+w.y2)/200); }
+function updateWallUI(){
+  const w=selWall&&WALLS.find(q=>wallKey(q)===selWall), base=selWall&&PLAN.walls.find(q=>q.key===selWall), e=selWall?wallEdits.edits[selWall]:null;
+  $('wallSel').hidden=!(selWall&&(w||base)); showWallBox(selWallMesh,draft?(w||null):null);
+  if(!selWall||!(w||base)) return;
+  const ref=w||base, hz=(ref.x2-ref.x1)>(ref.y2-ref.y1), len=Math.round(hz?ref.x2-ref.x1:ref.y2-ref.y1), th=Math.round(hz?ref.y2-ref.y1:ref.x2-ref.x1);
+  const lab=hz?['למעלה','למטה']:['שמאלה','ימינה'];
+  $('wsM60').textContent=lab[0]+' 60'; $('wsM10').textContent=lab[0]+' 10'; $('wsP10').textContent=lab[1]+' 10'; $('wsP60').textContent=lab[1]+' 60';
+  const moved=e&&e.d?` · הוזז ${Math.abs(e.d)} ס"מ ${e.d>0?lab[1]:lab[0]}`:'', gone=e&&e.rm?' · הוסר בהצעה':'';
+  $('wsInfo').textContent=`קיר באורך ${len} ס"מ, עובי ${th} ס"מ${base&&base.open.length?', עם '+base.open.length+' פתחים':''}${moved}${gone}. 60 ס"מ הם משבצת אחת ברצפה.`+(th>8?' קיר עבה: נראה תומך, נדרש אישור מהנדס.':'')+(ref.added?' קיר שנוסף בהצעה.':'');
+  ['wsM60','wsM10','wsP10','wsP60'].forEach(k=>$(k).disabled=!!(e&&e.rm)||!!ref.added); $('wsRm').disabled=!!(e&&e.rm); $('wsRm').textContent=ref.added?'מחיקת הקיר':'הסרת הקיר';
+}
+function editWall(fn){ if(!draft||!selWall) return; const cur=wallEdits; const next=clone(cur); fn(next); wallEdits=next; applyStructure(); buildAll(); applyMode(); drawMapBase(); updateWallUI(); save(); }
+$('wPick').onclick=()=>{ wallPick=!wallPick; $('wPick').setAttribute('aria-pressed',String(wallPick)); if(wallPick){ placing&&setPlacing(false); toast('לחצו על קיר כדי לבחור אותו'); } else hlGroup.visible=false; };
+const nudge=d=>editWall(n=>{ const e=n.edits[selWall]||{}; const v=(e.d||0)+d; if(v) n.edits[selWall]={d:v}; else delete n.edits[selWall]; });
+$('wsM60').onclick=()=>nudge(-60); $('wsM10').onclick=()=>nudge(-10); $('wsP10').onclick=()=>nudge(10); $('wsP60').onclick=()=>nudge(60);
+$('wsRm').onclick=()=>editWall(n=>{ if(selWall.startsWith('n:')){ n.add=n.add.filter(a=>'n:'+a.id!==selWall); selWall=null; } else n.edits[selWall]={rm:true}; windows=windows.filter(u=>u.wall!==selWall||!n.edits[u.wall]); });
+$('wsReset').onclick=()=>editWall(n=>{ delete n.edits[selWall]; });
+
+/* differences between the proposal and the original */
+const sameItem=(a,b)=>Math.abs(a.x-b.x)<.01&&Math.abs(a.z-b.z)<.01&&(a.rot||0)%360===(b.rot||0)%360&&a.w===b.w&&a.d===b.d&&a.h===b.h&&(a.base||0)===(b.base||0);
+function diffStates(o,n){
+  const om=new Map((o.items||[]).map(i=>[i.id,i])), nm=new Map((n.items||[]).map(i=>[i.id,i]));
+  const added=[],moved=[],removed=[];
+  nm.forEach((i,id)=>{ const p=om.get(id); if(!p) added.push(i); else if(!sameItem(p,i)) moved.push([p,i]); });
+  om.forEach((i,id)=>{ if(!nm.has(id)) removed.push(i); });
+  const ow=new Map((o.windows||[]).map(w=>[w.id,JSON.stringify([w.wall,w.a,w.b,w.sill,w.head])])), nw=new Map((n.windows||[]).map(w=>[w.id,JSON.stringify([w.wall,w.a,w.b,w.sill,w.head])]));
+  let win=0; nw.forEach((v,k)=>{ if(ow.get(k)!==v) win++; }); ow.forEach((v,k)=>{ if(!nw.has(k)) win++; });
+  const keys=new Set([...Object.keys(o.owners||{}),...Object.keys(n.owners||{})]); let own=0; keys.forEach(k=>{ if((o.owners||{})[k]!==(n.owners||{})[k]) own++; });
+  const ew=(o.walls&&o.walls.edits)||{}, nwE=(n.walls&&n.walls.edits)||{}; let walls=0; new Set([...Object.keys(ew),...Object.keys(nwE)]).forEach(k=>{ if(JSON.stringify(ew[k])!==JSON.stringify(nwE[k])) walls++; });
+  const ea=new Map(((o.walls&&o.walls.add)||[]).map(a=>[a.id,JSON.stringify(a)])), na=new Map(((n.walls&&n.walls.add)||[]).map(a=>[a.id,JSON.stringify(a)])); na.forEach((v,k)=>{ if(ea.get(k)!==v) walls++; }); ea.forEach((v,k)=>{ if(!na.has(k)) walls++; });
+  return {added,moved,removed,win,own,walls,ceil:Math.abs((o.ceil||0)-(n.ceil||0))>.001};
+}
+const ghostGroup=new THREE.Group(); scene.add(ghostGroup);
+const ghostMats={old:new THREE.MeshBasicMaterial({color:0xe0a020,transparent:true,opacity:.35,depthWrite:false}),gone:new THREE.MeshBasicMaterial({color:0xc43f35,transparent:true,opacity:.38,depthWrite:false})};
+const edgeMats={old:new THREE.LineBasicMaterial({color:0xb37a00}),gone:new THREE.LineBasicMaterial({color:0xc43f35}),add:new THREE.LineBasicMaterial({color:0x2f9e5a})};
+const unitBox=new THREE.BoxGeometry(1,1,1), unitEdges=new THREE.EdgesGeometry(unitBox);
+function ghostBox(it,kind,withFill){ const H=(it.h+(it.base||0))/100, g=new THREE.Group();
+  if(withFill){ const m=new THREE.Mesh(unitBox,ghostMats[kind]); g.add(m); }
+  const e=new THREE.LineSegments(unitEdges,edgeMats[kind]); g.add(e);
+  g.scale.set(it.w/100+.04,H+.04,it.d/100+.04); g.position.set(it.x,H/2,it.z); g.rotation.y=-(it.rot||0)*Math.PI/180; ghostGroup.add(g); }
+let lastDiff=null;
+function updateDiff(){
+  while(ghostGroup.children.length) ghostGroup.remove(ghostGroup.children[0]);
+  if(!draft||!origState){ lastDiff=null; return; }
+  const d=lastDiff=diffStates(origState,state());
+  const parts=[];
+  if(d.added.length) parts.push(`<span><i class="lg" style="background:var(--new)"></i>${d.added.length} נוספו</span>`);
+  if(d.moved.length) parts.push(`<span><i class="lg" style="background:var(--amber)"></i>${d.moved.length} הוזזו או שונו</span>`);
+  if(d.removed.length) parts.push(`<span><i class="lg" style="background:var(--tag)"></i>${d.removed.length} נמחקו</span>`);
+  if(d.walls) parts.push(`<span>${d.walls} שינויי קירות</span>`);
+  if(d.win) parts.push(`<span>${d.win} שינויי חלונות</span>`);
+  if(d.own) parts.push(`<span>${d.own} שינויי שמות חדרים</span>`);
+  if(d.ceil) parts.push('<span>גובה תקרה שונה</span>');
+  $('draftDiff').innerHTML=parts.length?'לעומת המקור: '+parts.join(' · '):'עדיין אין שינויים לעומת המקור.';
+  if(!comparing) return;
+  d.added.forEach(i=>ghostBox(i,'add',false));
+  d.moved.forEach(([o])=>ghostBox(o,'old',true));
+  d.removed.forEach(i=>ghostBox(i,'gone',true));
+}
+let armed=null, armT=null;
+function resetArm(){ armed=null; clearTimeout(armT); $('dApply').textContent='החלה על המקור'; $('dDel').textContent='מחיקת ההצעה'; }
+function arm(btn,label,fn){ if(armed===btn){ resetArm(); fn(); return; } resetArm(); armed=btn; $(btn).textContent=label; armT=setTimeout(resetArm,4000); }
+$('pNew').onclick=()=>{ startDraft($('pName').value); $('pName').value=''; };
+$('pName').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); $('pNew').click(); } });
+$('dCompare').onclick=()=>{ comparing=!comparing; $('dCompare').setAttribute('aria-pressed',String(comparing)); updateDiff(); if(comparing) toast('ירוק: נוסף · כתום: המקום המקורי של פריט שהוזז · אדום: פריט שנמחק'); };
+$('dSend').onclick=()=>$('sendBtn').click();
+$('dExit').onclick=exitDraft;
+$('dApply').onclick=()=>{ const changed=origState&&draft.base&&JSON.stringify(cleanState(origState))!==JSON.stringify(cleanState(draft.base));
+  arm('dApply',changed?'המקור השתנה מאז. ללחוץ שוב כדי להחליף אותו בכל זאת':'ללחוץ שוב כדי להחליף את המקור',applyDraft); };
+$('dDel').onclick=()=>arm('dDel','ללחוץ שוב למחיקת ההצעה',deleteDraft);
+
 const ARTIFACT_URL=location.href.split('#')[0];
 let db=null, docRef=null, savedJSON='';
 const LS='mechina-layout-v1';
-const state=()=>({items,ceil:CEIL,owners,windows});
+const state=()=>({items,ceil:CEIL,owners,windows,walls:wallEdits,rooms:roomEdits});
 function applyState(s){
   if(!s) return;
   if(Array.isArray(s.items)) items=s.items.filter(i=>i&&typeof i.x==='number').map(i=>({...i}));
   if(typeof s.ceil==='number'&&s.ceil!==CEIL){ CEIL=s.ceil; $('ceilR').value=CEIL; $('ceilV').textContent=CEIL.toFixed(2)+' מטר'; buildAll(); applyMode(); }
   let rb=false;
+  const nwe=s.walls&&s.walls.edits?s.walls:{edits:{},add:[]}, nre=s.rooms||{};
+  if(JSON.stringify(nwe)!==JSON.stringify(wallEdits)||JSON.stringify(nre)!==JSON.stringify(roomEdits)){ wallEdits=clone(nwe); roomEdits=clone(nre); applyStructure(); rb=true; buildLabels(); if(typeof drawMapBase==='function') setTimeout(drawMapBase,0); }
   if(s.windows&&JSON.stringify(s.windows)!==JSON.stringify(windows)){ windows=s.windows.map(u=>({...u})); rb=true; }
   if(s.owners&&JSON.stringify(s.owners)!==JSON.stringify(owners)){ owners={...s.owners}; buildLabels(); fillOwners(); lastRoom=undefined; }
   if(rb){ if(!windows.find(u=>u.id===selWin)) selWin=null; buildAll(); applyMode(); drawMapBase(); }
@@ -881,11 +1079,12 @@ let saveT=null, pristine=false;
 const NOSHARE='השינויים נשמרים אצלכם בלבד. כדי להעביר אותם לאחרים השתמשו בכפתור שליחה.';
 function setStatus(t){ $('status').textContent=t; }
 function save(){
+  if(draft){ saveDraft(); return; }
   clearTimeout(saveT); pristine=false;
   saveT=setTimeout(async()=>{
     const s=state(), j=JSON.stringify(s);
     if(j===savedJSON) return;
-    savedJSON=j;
+    savedJSON=j; origState=JSON.parse(j);
     try{ localStorage.setItem(LS,j); }catch(e){}
     if(docRef){ try{ await docRef.set(JSON.parse(j)); setStatus('נשמר לכל מי שפותח את הדף'); }catch(e){ setStatus(NOSHARE); } }
     else setStatus(NOSHARE);
@@ -895,16 +1094,25 @@ async function connectDB(){
   let hadLocal=false;
   try{ const raw=localStorage.getItem(LS); if(raw){ savedJSON=raw; applyState(JSON.parse(raw)); hadLocal=true; } }catch(e){}
   if(!hadLocal){ applyState(BAKED); savedJSON=JSON.stringify(state()); pristine=true; }
+  origState=JSON.parse(JSON.stringify(state()));
+  loadProps(); try{ const o=localStorage.getItem(LSD); if(o&&props[o]) openDraft(props[o],true); }catch(e){}
   if(!window.claude||!claude.use){ setStatus(NOSHARE); processLink(); return; }
   db=null;
   if(!db){ setStatus(NOSHARE); processLink(); return; }
   docRef=db.doc('layout/main');
   docRef.onSnapshot(sn=>{
     if(!sn.exists){ return; }
-    const d=sn.data(), j=JSON.stringify({items:d.items||[],ceil:d.ceil,owners:d.owners||{},windows:d.windows||[]});
-    pristine=false; if(j!==savedJSON&&!dragging){ savedJSON=j; applyState(d); setStatus('עודכן מהשמירה המשותפת'); }
+    const d=sn.data(), j=JSON.stringify({items:d.items||[],ceil:d.ceil,owners:d.owners||{},windows:d.windows||[],walls:d.walls||{edits:{},add:[]},rooms:d.rooms||{}});
+    pristine=false;
+    if(draft){ origState=JSON.parse(j); savedJSON=j; updateDiff(); return; }
+    if(j!==savedJSON&&!dragging){ savedJSON=j; applyState(d); origState=JSON.parse(j); setStatus('עודכן מהשמירה המשותפת'); }
   },()=>setStatus('החיבור לשמירה המשותפת נותק. רעננו את הדף.'));
-  setStatus('שינויים נשמרים לכל מי שפותח את הדף');
+  setStatus(draft?'עובדים על הצעה. המקור לא משתנה.':'שינויים נשמרים לכל מי שפותח את הדף');
+  propCol=db.collection('proposals');
+  propCol.onSnapshot(q=>{ q.docs.forEach(d=>{ const v=d.data(); if(!v||!v.state) return; const p=cleanProp(d.id,v); const cur=props[d.id];
+      if(!cur||(p.updated||0)>(cur.updated||0)){ props[d.id]=p; if(draft&&draft.id===d.id&&!dragging&&!held){ draft=p; applyState(p.state); updateDiff(); } } });
+    q.docChanges().forEach(c=>{ if(c.type==='removed'&&props[c.doc.id]&&!(draft&&draft.id===c.doc.id)) delete props[c.doc.id]; });
+    storeProps(); renderProps(); },()=>{});
   setTimeout(processLink,1500);
 }
 
@@ -929,7 +1137,7 @@ function updateWhere(){
   const r=currentRoom(player.x,player.z); if(r===lastRoom) return; lastRoom=r;
   $('whereTag').textContent=r?(r.tag==='-'?'·':r.tag):'·';
   if(r) $('rooms').value=r.id;
-  $('whereArea').innerHTML=r&&r.printed?`<span class="mono">${r.printed.toFixed(2)}</span> מ"ר`:'';
+  $('whereArea').innerHTML=r&&r.changed?`<span class="mono">~${r.area.toFixed(2)}</span> מ"ר`:r&&r.printed?`<span class="mono">${r.printed.toFixed(2)}</span> מ"ר`:'';
   const canOwn=r&&r.plate; $('whereOwner').textContent=''; $('ownBtn').hidden=!canOwn; $('ownBtn').textContent=canOwn&&owners[r.id]?'שינוי':'של מי?';
 }
 function teleport(x,z){ if(hitsWall(x,z)){ // find a nearby free spot
@@ -980,6 +1188,7 @@ function stickEnd(){ stick.id=null; joyVec={x:0,y:0}; const j=$('joy'); j.style.
 function capture(id){ try{ canvas.setPointerCapture(id); }catch(e){} }
 canvas.addEventListener('pointerdown',e=>{
   if(locked){ e.preventDefault(); crosshairClick(); return; }
+  if(wallPick&&draft){ setRay(e); const w=aimAnyWall(); if(w){ selWall=wallKey(w); updateWallUI(); if($('panel').hidden) setPanel(true); } else toast('לא נמצא כאן קיר'); return; }
   if(placing){ setRay(e); const a=aimWall(); if(a) placeWindow(a); else toast('כאן אין קיר שאפשר לשים בו חלון. נסו קיר אחר.'); return; }
   capture(e.pointerId);
   const rec={x:e.clientX,y:e.clientY,moved:0,role:'look',mouse:e.pointerType==='mouse'};
@@ -1022,7 +1231,7 @@ function finishPtr(pid,p,type){
   if(p.role==='look'&&p.moved<5){ selWin=null; select(null); if(p.mouse&&mode==='walk'&&type==='pointerup') enterLock(); }
   if(ptrs.size===0) canvas.classList.remove('drag');
 }
-canvas.addEventListener('pointermove',e=>{ if(placing&&!locked&&ptrs.size===0){ setRay(e); hoverWall(); } });
+canvas.addEventListener('pointermove',e=>{ if(placing&&!locked&&ptrs.size===0){ setRay(e); hoverWall(); } else if(wallPick&&draft&&!locked&&ptrs.size===0){ setRay(e); const w=aimAnyWall(); hlGroup.visible=!!w; ghostWin.visible=false; if(w){ MATS.hl.color.setHex(0x2547a8); showWallBox(ghostWall,w); } } });
 canvas.addEventListener('pointerleave',()=>{ if(softLook&&!locked){ softLook=false; updateHelp(); } });
 addEventListener('pointerup',endPtr,true); addEventListener('pointercancel',endPtr,true);
 
@@ -1039,7 +1248,7 @@ function aimWall(){
   let best=1e9; colliders.forEach(c=>{ const t=slab3(o,d,c,top); if(t!==null&&t<best) best=t; });
   if(best>=1e9) return null;
   const x=(o.x+d.x*(best+.005))*100, y=(o.z+d.z*(best+.005))*100;
-  const w=PLAN.walls.find(q=>canHoldWindow(q)&&x>=q.x1-.5&&x<=q.x2+.5&&y>=q.y1-.5&&y<=q.y2+.5);
+  const w=WALLS.find(q=>canHoldWindow(q)&&x>=q.x1-.5&&x<=q.x2+.5&&y>=q.y1-.5&&y<=q.y2+.5);
   if(!w) return null;
   const hz=(w.x2-w.x1)>(w.y2-w.y1), along=hz?x:y, k=wallKey(w);
   return {w,hz,along,win:windows.find(u=>u.wall===k&&along>=u.a&&along<=u.b)||null};
@@ -1188,7 +1397,7 @@ function drawMapBase(){
   mapBase=off;
 }
 function drawMap(){
-  if(!mapBase) return; const dpr=Math.min(devicePixelRatio||1,2),{s,ox,oy}=mapScale();
+  if(!mapBase||!mapBase.width||!mapBase.height||!mapC.clientWidth) return; const dpr=Math.min(devicePixelRatio||1,2),{s,ox,oy}=mapScale();
   const X=x=>ox+(x*100-MB.x1)*s, Y=z=>oy+(z*100-MB.y1)*s;
   mapX.setTransform(1,0,0,1,0,0); mapX.drawImage(mapBase,0,0); mapX.setTransform(dpr,0,0,dpr,0,0);
   items.forEach(it=>{ mapX.save(); mapX.translate(X(it.x),Y(it.z)); mapX.rotate((it.rot||0)*Math.PI/180); mapX.fillStyle=it.id===selected?'#c43f35':it.pin?'#566473':'#2547a8'; mapX.fillRect(-it.w*s/2,-it.d*s/2,it.w*s,Math.max(1,it.d*s)); mapX.restore(); });
@@ -1217,7 +1426,7 @@ function togglePin(){ const it=items.find(i=>i.id===selected), u=windows.find(q=
 $('pin').onclick=togglePin; $('wPin').onclick=togglePin;
 $('pinAll').onclick=()=>{ const on=!items.every(i=>i.pin); items.forEach(i=>{ if(on) i.pin=true; else delete i.pin; }); updateSelUI(); save(); };
 [['wW','w'],['wS','s'],['wH','h']].forEach(([id,k])=>{ $(id).addEventListener('change',e=>{
-  const u=windows.find(q=>q.id===selWin); if(!u) return; const v=+e.target.value, w=PLAN.walls.find(q=>wallKey(q)===u.wall), maxH=Math.round(CEIL*100);
+  const u=windows.find(q=>q.id===selWin); if(!u) return; const v=+e.target.value, w=WALLS.find(q=>wallKey(q)===u.wall), maxH=Math.round(CEIL*100);
   if(k==='w'&&v>=30){ const f=fitWindow(w,(u.a+u.b)/2,v,u.id); if(f){u.a=f.a;u.b=f.b;} }
   if(k==='s'&&v>=0&&v+20<=maxH){ const h=u.head-u.sill; u.sill=v; u.head=Math.min(maxH,v+h); }
   if(k==='h'&&v>=20){ u.head=Math.min(maxH,u.sill+v); }
@@ -1255,7 +1464,7 @@ function toB32(u){ let o='',b=0,n=0; for(const v of u){ b=(b<<8)|v; n+=8; while(
 function fromB32(t){ const o=[]; let b=0,n=0; for(const c of t){ const v=B32.indexOf(c); if(v<0) throw new Error('bad'); b=(b<<5)|v; n+=5; if(n>=8){ o.push((b>>(n-8))&255); n-=8; } b&=(1<<n)-1; } return new Uint8Array(o); }
 async function pipe(u,stream){ const r=new Blob([u]).stream().pipeThrough(stream); return new Uint8Array(await new Response(r).arrayBuffer()); }
 async function encodeState(){
-  const raw=new TextEncoder().encode(JSON.stringify(state()));
+  const raw=new TextEncoder().encode(JSON.stringify(draft?{...state(),pname:draft.name}:state()));
   if(window.CompressionStream){ try{ return 'lz'+toB32(await pipe(raw,new CompressionStream('deflate-raw'))); }catch(e){} }
   return 'lr'+toB32(raw);
 }
@@ -1268,15 +1477,24 @@ async function decodeState(text){
 }
 function cleanState(s){ // a layout from a link is outside data: keep only well-formed fields
   const num=(v,a,b)=>typeof v==='number'&&isFinite(v)&&v>=a&&v<=b; const txt=(v,n)=>String(v==null?'':v).slice(0,n);
-  const types=new Set(CATALOG.map(c=>c.type)), walls=new Set(PLAN.walls.filter(canHoldWindow).map(wallKey)), roomIds=new Set(PLAN.rooms.filter(r=>r.plate).map(r=>r.id));
+  const types=new Set(CATALOG.map(c=>c.type)), walls=new Set([...PLAN_KEYS,...((s.walls&&Array.isArray(s.walls.add))?s.walls.add.map(a=>'n:'+String(a.id).slice(0,40)):[])]), roomIds=new Set(PLAN.rooms.filter(r=>r.plate).map(r=>r.id));
   const items=(Array.isArray(s.items)?s.items:[]).slice(0,500).filter(i=>i&&types.has(i.type)&&num(i.x,-15,15)&&num(i.z,-5,30)&&num(i.w,5,1200)&&num(i.d,5,1200)&&num(i.h,5,500))
     .map(i=>({id:txt(i.id,40)||('i'+Math.random().toString(36).slice(2)),type:i.type,name:txt(i.name,60),x:i.x,z:i.z,w:i.w,d:i.d,h:i.h,base:num(i.base,0,300)?i.base:0,rot:num(i.rot,-360,720)?i.rot:0,...(i.pin?{pin:true}:{})}));
   const windowsIn=(Array.isArray(s.windows)?s.windows:[]).slice(0,200).filter(u=>u&&walls.has(u.wall)&&num(u.a,-2000,3000)&&num(u.b,-2000,3000)&&u.b>u.a&&num(u.sill,0,400)&&num(u.head,0,500)&&u.head>u.sill)
     .map(u=>({id:txt(u.id,40)||('w'+Math.random().toString(36).slice(2)),wall:u.wall,a:u.a,b:u.b,sill:u.sill,head:u.head,...(u.pin?{pin:true}:{})}));
   const own={}; if(s.owners&&typeof s.owners==='object') Object.keys(s.owners).forEach(k=>{ if(roomIds.has(k)&&s.owners[k]) own[k]=txt(s.owners[k],60); });
-  return {items,windows:windowsIn,owners:own,ceil:num(s.ceil,2.6,3.9)?s.ceil:CEIL};
+  const we={edits:{},add:[]};
+  if(s.walls&&typeof s.walls==='object'){
+    if(s.walls.edits&&typeof s.walls.edits==='object') Object.keys(s.walls.edits).slice(0,200).forEach(k=>{ if(!PLAN_KEYS.has(k)) return; const e=s.walls.edits[k]||{}; if(e.rm) we.edits[k]={rm:true}; else if(num(e.d,-600,600)&&e.d) we.edits[k]={d:Math.round(e.d)}; });
+    if(Array.isArray(s.walls.add)) s.walls.add.slice(0,100).forEach(a=>{ if(a&&num(a.x1,-1200,1200)&&num(a.x2,-1200,1200)&&num(a.y1,-100,2400)&&num(a.y2,-100,2400)&&a.x2>a.x1&&a.y2>a.y1) we.add.push({id:txt(a.id,40)||('a'+Math.random().toString(36).slice(2)),x1:a.x1,x2:a.x2,y1:a.y1,y2:a.y2,...(num(a.h,40,400)?{h:a.h}:{})}); });
+  }
+  const re={}; if(s.rooms&&typeof s.rooms==='object') Object.keys(s.rooms).forEach(k=>{ if(!PLAN.rooms.find(r=>r.id===k)) return; const o=s.rooms[k]||{}, out={};
+    if(Array.isArray(o.rects)){ const rr=o.rects.slice(0,8).filter(q=>Array.isArray(q)&&q.length===4&&q.every(v=>num(v,-1200,2400))&&q[1]>q[0]&&q[3]>q[2]); if(rr.length) out.rects=rr; }
+    if(o.noPlate) out.noPlate=true; if(Object.keys(out).length) re[k]=out; });
+  return {items,windows:windowsIn,owners:own,walls:we,rooms:re,ceil:num(s.ceil,2.6,3.9)?s.ceil:CEIL,...(s.pname?{pname:txt(s.pname,80)}:{})};
 }
-function replaceLayout(inc){ applyState(inc); fillOwners(); lastRoom=undefined; save(); }
+function stripName(s){ const {pname,...r}=s; return r; }
+function replaceLayout(inc){ inc=stripName(inc); applyState(inc); fillOwners(); lastRoom=undefined; save(); }
 function mergeLayout(inc){ // the union of both layouts; the incoming copy wins when the same object appears twice
   const byId=(mine,theirs)=>{ const m=new Map(mine.map(x=>[x.id,x])); theirs.forEach(x=>m.set(x.id,x)); return [...m.values()]; };
   replaceLayout({items:byId(items,inc.items),windows:byId(windows,inc.windows),owners:{...owners,...inc.owners},ceil:CEIL});
@@ -1286,15 +1504,17 @@ function clearLinkHash(){ try{ if(location.hash) location.hash=''; }catch(e){} }
 async function processLink(){
   const h=(location.hash||'').slice(1); if(!/^l[zr][a-z2-7]{8,}$/.test(h)) return;
   try{ const inc=await decodeState(h);
-    if(pristine&&!docRef){ applyState(inc); fillOwners(); lastRoom=undefined; savedJSON=JSON.stringify(state()); toast('נפתח הסידור שנשלח אליכם'); return; }
-    pendingLink=inc; $('incoming').hidden=false;
+    if(pristine&&!docRef&&!inc.pname){ applyState(inc); fillOwners(); lastRoom=undefined; savedJSON=JSON.stringify(state()); origState=clone(state()); toast('נפתח הסידור שנשלח אליכם'); return; }
+    if(inc.pname&&!draft&&pristine&&!docRef){ startDraft(inc.pname,stripName(inc)); clearLinkHash(); return; }
+    pendingLink=inc; $('incoming').firstElementChild.textContent=inc.pname?'קיבלתם הצעה: '+inc.pname:'קיבלתם סידור בקישור'; $('incoming').hidden=false;
   }catch(e){ toast('הקישור שקיבלתם לא תקין או נקטע. בקשו שישלחו אותו שוב.'); }
 }
 addEventListener('hashchange',processLink);
+$('inDraft').onclick=()=>{ if(pendingLink) startDraft(pendingLink.pname||'הצעה שקיבלתם',stripName(pendingLink)); pendingLink=null; $('incoming').hidden=true; clearLinkHash(); };
 $('inMerge').onclick=()=>{ if(pendingLink) mergeLayout(pendingLink); pendingLink=null; $('incoming').hidden=true; clearLinkHash(); toast('הסידור נוסף'); };
 $('inReplace').onclick=()=>{ if(pendingLink) replaceLayout(pendingLink); pendingLink=null; $('incoming').hidden=true; clearLinkHash(); toast('הסידור נפתח'); };
 $('inSkip').onclick=()=>{ pendingLink=null; $('incoming').hidden=true; clearLinkHash(); };
-$('sendBtn').onclick=async()=>{ $('send').hidden=false; $('sMsg').textContent=''; const code=await encodeState(); $('sLink').value=ARTIFACT_URL+'#'+code; };
+$('sendBtn').onclick=async()=>{ $('send').hidden=false; $('sCopy').textContent=draft?'העתקת קישור להצעה "'+draft.name+'"':'העתקת קישור עם הסידור שלי'; $('sMsg').textContent=''; const code=await encodeState(); $('sLink').value=ARTIFACT_URL+'#'+code; };
 $('sClose').onclick=()=>{ $('send').hidden=true; };
 $('send').addEventListener('click',e=>{ if(e.target===$('send')) $('send').hidden=true; });
 $('sCopy').onclick=async()=>{ const v=ARTIFACT_URL+'#'+await encodeState(); $('sLink').value=v;
@@ -1303,7 +1523,8 @@ $('sCopy').onclick=async()=>{ const v=ARTIFACT_URL+'#'+await encodeState(); $('s
   catch(e){ sel(); $('sMsg').textContent='סימנתי את הקישור, העתיקו אותו ידנית.'; } };
 const fromPaste=async fn=>{ try{ const inc=await decodeState($('sIn').value); fn(inc); $('sIn').value=''; $('sMsg').textContent=`נטען: ${inc.items.length} פריטים, ${inc.windows.length} חלונות.`; }
   catch(e){ $('sMsg').textContent='לא הצלחתי לקרוא את הקישור. ודאו שהעתקתם אותו במלואו.'; } };
-$('sMerge').onclick=()=>fromPaste(mergeLayout);
+$('sDraft').onclick=()=>fromPaste(inc=>{ startDraft(inc.pname||'הצעה שקיבלתם',stripName(inc)); $('send').hidden=true; });
+$('sMerge').onclick=()=>fromPaste(inc=>mergeLayout(inc));
 $('sReplace').onclick=()=>fromPaste(replaceLayout);
 
 /* ===================== Loop ===================== */
