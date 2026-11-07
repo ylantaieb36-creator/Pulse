@@ -461,6 +461,7 @@ const CATALOG = [
   {type:'cab',   name:'ארון',       w:100,d:50,h:200},
   {type:'board', name:'לוח קיר',    w:300,d:8, h:120,base:90},
   {type:'wall',  name:'מחיצה',      w:200,d:10,h:250},
+  {type:'panel', name:'מחיצת שולחן', w:160,d:5,h:130},
   {type:'sofa',  name:'ספה',        w:180,d:80,h:80},
   {type:'block', name:'גוש חופשי',  w:100,d:100,h:100},
 ];
@@ -821,7 +822,7 @@ function rayMinT(){ if(mode!=='walk'||camCut<=0) return 0; const dot=ray.ray.dir
 /* ===================== Items ===================== */
 let items=[]; let selected=null; let selWin=null, placing=false;
 const itemsGroup=new THREE.Group(); scene.add(itemsGroup);
-const COL={pc:0xa98c66,pcrow:0xa98c66,desk:0x8a6f50,table:0xa98c66,chair:0x3f5a7a,cab:0x98a0a8,board:0xf8f8f4,wall:0xdcdcd4,sofa:0x5d7468,block:0xc98f4a};
+const COL={panel:0x8c9aa6,pc:0xa98c66,pcrow:0xa98c66,desk:0x8a6f50,table:0xa98c66,chair:0x3f5a7a,cab:0x98a0a8,board:0xf8f8f4,wall:0xdcdcd4,sofa:0x5d7468,block:0xc98f4a};
 const lam=c=>new THREE.MeshLambertMaterial({color:c,clippingPlanes:[camPlane]});
 const boxMesh=(w,h,d,x,y,z,m)=>{ const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m); o.position.set(x,y,z); return o; };
 function buildItemMesh(it){
@@ -852,6 +853,11 @@ function buildItemMesh(it){
     const ar=Math.min(.2,W/4);
     g.add(boxMesh(W,H*.5,D,0,H*.25,0,m)); g.add(boxMesh(W,H,.2,0,H/2,-D/2+.1,m));
     g.add(boxMesh(ar,H*.75,D,W/2-ar/2,H*.375,0,m)); g.add(boxMesh(ar,H*.75,D,-W/2+ar/2,H*.375,0,m));
+  } else if(it.type==='panel'){ // free-standing screen the length of a two-person desk
+    const ft=Math.min(.35,D+.3), fab=lam(0x8c9aa6);
+    g.add(boxMesh(W,H-.04,D,0,.04+(H-.04)/2,0,fab));
+    g.add(boxMesh(W+.02,.025,D+.02,0,H,0,metal));
+    [-W/2+.08,W/2-.08].forEach(x=>g.add(boxMesh(.05,.03,ft,x,.015,0,metal)));
   } else if(it.type==='board'){
     g.add(boxMesh(W,H,D,0,base+H/2,0,m)); g.add(boxMesh(W+.04,.03,D+.04,0,base,0,metal));
   } else {
@@ -1430,7 +1436,7 @@ mapC.addEventListener('pointerdown',e=>{ const r=mapC.getBoundingClientRect(),{s
   if(mode!=='walk'){ mode='walk'; applyMode(); } lastRoom=undefined; });
 
 /* ===================== UI wiring ===================== */
-CATALOG.forEach((c,n)=>{ const b=document.createElement('button'); b.innerHTML=`<span>${c.name} <small style="display:inline">[${(n+1)%10}]</small></span><small>${c.w}×${c.d}×${c.h}</small>`; b.onclick=()=>addItem(c); $('cat').appendChild(b); });
+CATALOG.forEach((c,n)=>{ const b=document.createElement('button'); b.innerHTML=`<span>${c.name} <small style="display:inline">${n<10?'['+((n+1)%10)+']':''}</small></span><small>${c.w}×${c.d}×${c.h}</small>`; b.onclick=()=>addItem(c); $('cat').appendChild(b); });
 
 $('rooms').onchange=e=>{ const r=PLAN.rooms.find(q=>q.id===e.target.value); if(!r) return; const q=r.rects.slice().sort((a,b)=>(b[1]-b[0])*(b[3]-b[2])-(a[1]-a[0])*(a[3]-a[2]))[0];
   teleport((q[0]+q[1])/200,(q[2]+q[3])/200); lastRoom=undefined; if(mode!=='walk'){ mode='walk'; applyMode(); } e.target.blur(); };
