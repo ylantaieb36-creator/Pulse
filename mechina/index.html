@@ -196,6 +196,8 @@ th{font-weight:600;color:var(--ink2)}
         <button id="rot90">90°</button>
         <button id="rotR" title="סיבוב 15 מעלות">↻ 15°</button>
       </div>
+      <div class="row" id="seatRow" hidden><button id="reseat">סידור כיסאות לפי גודל השולחן</button></div>
+      <p class="hint" id="seatHint" hidden>הכיסאות זזים ומסתובבים יחד עם השולחן. כיסא מיותר: בוחרים אותו ומוחקים.</p>
       <p class="hint" id="rowHint" hidden>כל 120 ס"מ של רוחב הם עמדה אחת. שנו את הרוחב כדי להוסיף או להוריד עמדות.</p>
       <div id="gaps" aria-label="מרחקים מהקירות"></div>
       <div class="row"><button id="pin">נעילת הפריט</button></div>
@@ -896,7 +898,7 @@ function updateSelUI(){
   $('sel').hidden=!it;
   const uw=windows.find(u=>u.id===selWin); $('winSel').hidden=!uw;
   if(uw){ const f=(id,v)=>{ if(document.activeElement!==$(id)) $(id).value=Math.round(v); }; f('wW',uw.b-uw.a); f('wS',uw.sill); f('wH',uw.head-uw.sill); }
-  if(it) $('rowHint').hidden=it.type!=='pcrow';
+  if(it){ $('rowHint').hidden=it.type!=='pcrow'; const tb=TABLES.has(it.type); $('seatRow').hidden=!tb||!!it.pin; $('seatHint').hidden=!tb; }
   if(uw){ const w=WALLS.find(q=>wallKey(q)===uw.wall); $('wWarn').hidden=!(w&&isThick(w)); ['wW','wS','wH','wDel'].forEach(k=>$(k).disabled=!!uw.pin); $('wPin').textContent=uw.pin?'פתיחת הנעילה':'נעילה'; $('wHint').textContent=uw.pin?'החלון נעול, פתחו את הנעילה כדי לשנות אותו.':'גררו את החלון על הקיר כדי להזיז אותו.'; }
   if(it){ const on=!!it.pin; ['iW','iD','iH','rotL','rotR','rot90','del'].forEach(k=>$(k).disabled=on); $('pin').textContent=on?'🔒 פתיחת הנעילה':'נעילת הפריט'; }
   const allPin=items.length>0&&items.every(i=>i.pin); $('pinAll').textContent=allPin?'פתיחת כל הפריטים':'נעילת כל הפריטים';
@@ -917,8 +919,27 @@ function addItem(c){
   else { it.x=snap(orbit.tx); it.z=snap(orbit.tz); }
   const rr=Math.hypot(it.w,it.d)/200;
   if(hitsWall(it.x,it.z,rr)){ let done=false; for(let d=.25;d<14&&!done;d+=.25){ for(let a=0;a<6.28;a+=.3){ const nx=it.x+Math.cos(a)*d,nz=it.z+Math.sin(a)*d; if(!hitsWall(nx,nz,rr)&&currentRoom(nx,nz)){ it.x=snap(nx);it.z=snap(nz);done=true;break; } } } }
-  items.push(it); itemsGroup.add(buildItemMesh(it)); select(it.id); save();
+  items.push(it); itemsGroup.add(buildItemMesh(it));
+  if(TABLES.has(it.type)) seatChairs(it);
+  select(it.id); save();
 }
+/* chairs that belong to a table: added with it, move and turn with it, each one can be deleted */
+const TABLES=new Set(['desk','table']);
+function toWorld(t,lx,lz){ const a=(t.rot||0)*Math.PI/180; return [t.x+lx*Math.cos(a)-lz*Math.sin(a), t.z+lx*Math.sin(a)+lz*Math.cos(a)]; }
+function chairPlan(t){ const W=t.w/100,D=t.d/100, both=t.w>=240, per=t.type==='desk'&&!both?Math.max(1,Math.floor(t.w/130)):Math.max(1,Math.floor(t.w/(both?65:60)));
+  const out=[]; const side=(sgn)=>{ for(let i=0;i<per;i++){ const lx=-W/2+W*(i+.5)/per, lz=sgn*(D/2+.18); out.push({lx,lz,rel:sgn>0?180:0}); } };
+  side(1); if(both) side(-1); return out; }
+function seatChairs(t){
+  items.filter(i=>i.grp===t.id).forEach(i=>{ const m=meshOf(i.id); if(m) itemsGroup.remove(m); });
+  items=items.filter(i=>i.grp!==t.id);
+  chairPlan(t).forEach((c,k)=>{ const [x,z]=toWorld(t,c.lx,c.lz);
+    const ch={id:t.id+'c'+k+Math.floor(Math.random()*1e3),type:'chair',name:'כיסא',w:50,d:50,h:85,base:0,rot:((t.rot||0)+c.rel+360)%360,x,z,grp:t.id};
+    items.push(ch); itemsGroup.add(buildItemMesh(ch)); });
+}
+function groupOf(t){ return t&&TABLES.has(t.type)?items.filter(i=>i.grp===t.id):[]; }
+function shiftGroup(t,dx,dz){ groupOf(t).forEach(c=>{ c.x+=dx; c.z+=dz; const m=meshOf(c.id); if(m) m.position.set(c.x,0,c.z); }); }
+function turnGroup(t,deg){ const a=deg*Math.PI/180, ca=Math.cos(a), sa=Math.sin(a);
+  groupOf(t).forEach(c=>{ const ox=c.x-t.x, oz=c.z-t.z; c.x=t.x+ox*ca-oz*sa; c.z=t.z+ox*sa+oz*ca; c.rot=((c.rot||0)+deg+360)%360; refreshItem(c); }); }
 const snap=v=>Math.round(v*20)/20;
 
 /* ===================== Saving ===================== */
@@ -1212,7 +1233,7 @@ canvas.addEventListener('pointermove',e=>{
   if(p.role==='stick'){ stickMove(e); return; }
   if(p.role==='win'){ setRay(e); dragWin(p); return; }
   if(p.role==='pinch'&&ptrs.size===2){ const [a,b]=[...ptrs.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); if(pinch0>0) orbit.r=clampR(orbit.r*pinch0/d); pinch0=d; return; }
-  if(p.role==='item'&&dragging){ setRay(e); if(ray.ray.intersectPlane(floorPlane,pt)&&(mode!=='walk'||pt.distanceTo(camera.position)<12)){ dragging.it.x=snap(pt.x+dragging.ox); dragging.it.z=snap(pt.z+dragging.oz);
+  if(p.role==='item'&&dragging){ setRay(e); if(ray.ray.intersectPlane(floorPlane,pt)&&(mode!=='walk'||pt.distanceTo(camera.position)<12)){ { const px0=dragging.it.x,pz0=dragging.it.z; dragging.it.x=snap(pt.x+dragging.ox); dragging.it.z=snap(pt.z+dragging.oz); shiftGroup(dragging.it,dragging.it.x-px0,dragging.it.z-pz0); }
         const m=meshOf(dragging.it.id); if(m) m.position.set(dragging.it.x,0,dragging.it.z); updateOutline(); } return; }
   if(p.role==='look'||p.role==='pinned'){
     if(mode==='walk') look(dx,dy,lookK*(p.mouse?1.4:TOUCH_K));
@@ -1348,7 +1369,7 @@ addEventListener('keydown',e=>{
   keys[e.code]=true;
   const it=items.find(i=>i.id===selected);
   if(mode==='walk'&&e.code==='KeyF'&&!e.repeat) winFromCrosshair();
-  if(mode==='walk'&&/^Digit\d$/.test(e.code)&&!e.repeat){ const c=CATALOG[(+e.code.slice(5)+9)%10]; addItem(c); if(locked){ held=items[items.length-1]; $('cross').classList.add('hold'); } }
+  if(mode==='walk'&&/^Digit\d$/.test(e.code)&&!e.repeat){ const c=CATALOG[(+e.code.slice(5)+9)%10]; addItem(c); if(locked){ held=items.find(i=>i.id===selected)||null; $('cross').classList.add('hold'); } }
   if(e.code==='KeyL'&&!e.repeat) togglePin();
   if(e.code==='KeyV'&&!e.repeat) setThird(!third);
   if(it&&e.code==='KeyR'){ rotateSel(e.shiftKey?15:90); }
@@ -1377,8 +1398,8 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState!=
 addEventListener('touchend',e=>{ if(e.touches.length===0&&ptrs.size) [...ptrs.entries()].forEach(([id,p])=>{ if(!p.mouse) finishPtr(id,p,'pointercancel'); }); },true);
 addEventListener('touchcancel',e=>{ if(e.touches.length===0&&ptrs.size) [...ptrs.entries()].forEach(([id,p])=>{ if(!p.mouse) finishPtr(id,p,'pointercancel'); }); },true);
 
-function rotateSel(d){ const it=items.find(i=>i.id===selected); if(!it||it.pin) return; it.rot=((it.rot||0)+d+360)%360; refreshItem(it); save(); }
-function removeSel(){ const cur=items.find(i=>i.id===selected); if(cur&&cur.pin){ toast('הפריט נעול'); return; } if(held&&held.id===selected){ held=null; $('cross').classList.remove('hold'); } items=items.filter(i=>i.id!==selected); const m=meshOf(selected); if(m) itemsGroup.remove(m); selected=null; updateSelUI(); save(); }
+function rotateSel(d){ const it=items.find(i=>i.id===selected); if(!it||it.pin) return; it.rot=((it.rot||0)+d+360)%360; turnGroup(it,d); refreshItem(it); save(); }
+function removeSel(){ const cur=items.find(i=>i.id===selected); if(cur&&cur.pin){ toast('הפריט נעול'); return; } if(held&&held.id===selected){ held=null; $('cross').classList.remove('hold'); } const gone=groupOf(cur); gone.forEach(c=>{ const mm=meshOf(c.id); if(mm) itemsGroup.remove(mm); }); items=items.filter(i=>i.id!==selected&&!gone.includes(i)); const m=meshOf(selected); if(m) itemsGroup.remove(m); selected=null; updateSelUI(); save(); }
 
 /* ===================== Minimap ===================== */
 const mapC=$('map'), mapX=mapC.getContext('2d');
@@ -1440,7 +1461,9 @@ fillOwners();
 $('ownBtn').onclick=()=>{ const r=currentRoom(player.x,player.z); if(!r) return; setPanel(true); $('ownBox').open=true; const el=$('own-'+r.id.replace('.','_')); if(el){ el.scrollIntoView({block:'center'}); el.focus(); } };
 $('rotL').onclick=()=>rotateSel(-15); $('rotR').onclick=()=>rotateSel(15); $('rot90').onclick=()=>rotateSel(90);
 $('del').onclick=removeSel;
-$('dup').onclick=()=>{ const it=items.find(i=>i.id===selected); if(!it) return; const a=(it.rot||0)*Math.PI/180,dd=it.w/100; const n={...it,pin:false,id:'i'+Date.now().toString(36),x:snap(it.x+Math.cos(a)*dd),z:snap(it.z+Math.sin(a)*dd)}; items.push(n); itemsGroup.add(buildItemMesh(n)); select(n.id); save(); };
+$('reseat').onclick=()=>{ const it=items.find(i=>i.id===selected); if(!it||!TABLES.has(it.type)) return; seatChairs(it); updateSelUI(); save(); toast('הכיסאות סודרו מחדש'); };
+$('dup').onclick=()=>{ const it=items.find(i=>i.id===selected); if(!it) return; const a=(it.rot||0)*Math.PI/180,dd=it.w/100; const n={...it,pin:false,id:'i'+Date.now().toString(36),x:snap(it.x+Math.cos(a)*dd),z:snap(it.z+Math.sin(a)*dd)}; if(TABLES.has(n.type)){ const ddx=n.x-it.x,ddz=n.z-it.z; groupOf(it).forEach((c,k)=>{ const cc={...c,pin:false,id:n.id+'c'+k,grp:n.id,x:c.x+ddx,z:c.z+ddz}; items.push(cc); itemsGroup.add(buildItemMesh(cc)); }); }
+  items.push(n); itemsGroup.add(buildItemMesh(n)); select(n.id); save(); };
 [['iW','w'],['iD','d'],['iH','h']].forEach(([id,k])=>{ $(id).addEventListener('change',e=>{ const it=items.find(i=>i.id===selected); if(!it) return; const v=+e.target.value; if(v>=5&&v<=1200){ it[k]=v; refreshItem(it); save(); } else { e.target.value=it[k]; } }); });
 $('iName').addEventListener('change',e=>{ const it=items.find(i=>i.id===selected); if(it){ it.name=e.target.value; save(); } });
 let clearArm=null;
@@ -1479,7 +1502,7 @@ function cleanState(s){ // a layout from a link is outside data: keep only well-
   const num=(v,a,b)=>typeof v==='number'&&isFinite(v)&&v>=a&&v<=b; const txt=(v,n)=>String(v==null?'':v).slice(0,n);
   const types=new Set(CATALOG.map(c=>c.type)), walls=new Set([...PLAN_KEYS,...((s.walls&&Array.isArray(s.walls.add))?s.walls.add.map(a=>'n:'+String(a.id).slice(0,40)):[])]), roomIds=new Set(PLAN.rooms.filter(r=>r.plate).map(r=>r.id));
   const items=(Array.isArray(s.items)?s.items:[]).slice(0,500).filter(i=>i&&types.has(i.type)&&num(i.x,-15,15)&&num(i.z,-5,30)&&num(i.w,5,1200)&&num(i.d,5,1200)&&num(i.h,5,500))
-    .map(i=>({id:txt(i.id,40)||('i'+Math.random().toString(36).slice(2)),type:i.type,name:txt(i.name,60),x:i.x,z:i.z,w:i.w,d:i.d,h:i.h,base:num(i.base,0,300)?i.base:0,rot:num(i.rot,-360,720)?i.rot:0,...(i.pin?{pin:true}:{})}));
+    .map(i=>({id:txt(i.id,40)||('i'+Math.random().toString(36).slice(2)),type:i.type,name:txt(i.name,60),x:i.x,z:i.z,w:i.w,d:i.d,h:i.h,base:num(i.base,0,300)?i.base:0,rot:num(i.rot,-360,720)?i.rot:0,...(i.pin?{pin:true}:{}),...(i.grp?{grp:txt(i.grp,40)}:{})}));
   const windowsIn=(Array.isArray(s.windows)?s.windows:[]).slice(0,200).filter(u=>u&&walls.has(u.wall)&&num(u.a,-2000,3000)&&num(u.b,-2000,3000)&&u.b>u.a&&num(u.sill,0,400)&&num(u.head,0,500)&&u.head>u.sill)
     .map(u=>({id:txt(u.id,40)||('w'+Math.random().toString(36).slice(2)),wall:u.wall,a:u.a,b:u.b,sill:u.sill,head:u.head,...(u.pin?{pin:true}:{})}));
   const own={}; if(s.owners&&typeof s.owners==='object') Object.keys(s.owners).forEach(k=>{ if(roomIds.has(k)&&s.owners[k]) own[k]=txt(s.owners[k],60); });
@@ -1566,7 +1589,7 @@ function frame(){
         const hdx=pt.x-player.x,hdz=pt.z-player.z,hL=Math.hypot(hdx,hdz)||1,hd={x:hdx/hL,z:hdz/hL}; let hLim=hL;
         colliders.forEach(c=>{ const t=slab(player,hd,c); if(t!==null&&t<hLim) hLim=t; });
         if(hLim<hL){ const rr=Math.max(held.w,held.d)/200, keep=Math.max(.3,hLim-rr); pt.x=player.x+hd.x*keep; pt.z=player.z+hd.z*keep; }
-        held.x=snap(pt.x); held.z=snap(pt.z); const m=meshOf(held.id); if(m) m.position.set(held.x,0,held.z); updateOutline(); updateSelUI(); } }
+        { const hx0=held.x,hz0=held.z; held.x=snap(pt.x); held.z=snap(pt.z); shiftGroup(held,held.x-hx0,held.z-hz0); } const m=meshOf(held.id); if(m) m.position.set(held.x,0,held.z); updateOutline(); updateSelUI(); } }
   } else {
     const r=orbit.r,p=orbit.ph,t=orbit.th;
     camera.position.set(orbit.tx+r*Math.sin(p)*Math.sin(t),r*Math.cos(p),orbit.tz+r*Math.sin(p)*Math.cos(t));
