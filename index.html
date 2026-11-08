@@ -392,6 +392,30 @@ function toast(msg, ms = 3200) {
 function applyTheme() { const t = LS.get('theme', ''); if (t) document.documentElement.setAttribute('data-theme', t); else if (!window.claude) document.documentElement.removeAttribute('data-theme'); }
 function timeAgo(ts) { const m = Math.round((Date.now() - ts) / 60000); return m < 1 ? 'עכשיו' : m < 60 ? `לפני ${m} דק'` : `לפני ${Math.round(m / 60)} שע'`; }
 
+/* ---------------- ready-made lectures (presets) ----------------
+   Opened from a presentation with: ?host&r=CODE&preset=KEY&q=N
+   q = question number (1-based); q=0 = the join screen. The preset is used
+   only when the room does not exist yet, so later edits in "שאלות" are kept. */
+const PRESETS = {
+  eng: {
+    title: 'למה הנדסה? ולמה דווקא כאן - כנס לימודים אחרי צבא',
+    deck: [
+      { id: 'e_from', type: 'choice', text: 'מאיפה הגעתם?', options: ['אשדוד והסביבה', 'אשקלון והסביבה', 'באר שבע והדרום', 'קריית גת / שדרות / נתיבות', 'ירושלים והסביבה', 'מרכז הארץ', 'צפון הארץ', 'ממקום אחר'] },
+      { id: 'e_fields', type: 'open', text: 'איזה תחום באמת מדליק אתכם?' },
+      { id: 'e_criteria', type: 'choice', text: 'מה הכי חשוב לכם בבחירת מקצוע?', options: ['כסף ושכר', 'עניין ואהבה לתחום', 'ביטחון תעסוקתי', 'השפעה על העולם', 'יוקרה ומעמד', 'משהו אחר'] },
+      { id: 'e_place', type: 'choice', text: 'מה הכי ישפיע על הבחירה איפה ללמוד?', options: ['קרוב לבית', 'השם והיוקרה של המוסד', 'אוניברסיטה ולא מכללה', 'האווירה והיחס האישי', 'תנאי הקבלה', 'עלות ומלגות'] },
+      { id: 'e_name', type: 'yesno', text: 'השם של המוסד חשוב לכם יותר מהיחס שתקבלו בו?' },
+      { id: 'e_ai', type: 'yesno', text: 'האם AI יחליף את המהנדסים?' },
+      { id: 'e_barrier', type: 'open', text: 'מה הכי עוצר אתכם מלהתחיל ללמוד?' },
+      { id: 'e_consider', type: 'yesno', text: 'אחרי מה ששמעתם, הייתם שוקלים ללמוד הנדסה?' }
+    ]
+  }
+};
+const URLP = new URLSearchParams(location.search);
+const PRESET = PRESETS[URLP.get('preset')] || null;
+const LINK_ROOM = (URLP.get('r') || '').trim().toUpperCase();
+const LINK_Q = URLP.has('q') ? parseInt(URLP.get('q'), 10) : null;
+
 /* ---------------- default question deck ---------------- */
 const DEFAULT_DECK = [
   { id: 'q_from', type: 'choice', text: 'מאיפה הגעתם הבוקר?', options: ['אשדוד', 'אשקלון והסביבה', 'קריית גת / שדרות / נתיבות', 'באר שבע והדרום', 'מרכז הארץ', 'ממקום אחר'] },
@@ -568,6 +592,7 @@ async function startHost(root) {
     if (B.mode === 'live' && (!u || u.anon)) { routed = false; return renderLogin(root); }
     if (routed) return; routed = true;
     if (B.mode === 'demo') return openRoom(root, 'DEMO');
+    if (LINK_ROOM && /^[A-Z0-9]{3,10}$/.test(LINK_ROOM)) return openRoom(root, LINK_ROOM, PRESET && PRESET.title, PRESET && PRESET.deck, LINK_Q);
     const last = LS.get('room', '');
     if (last) openRoom(root, last); else renderRoomPicker(root);
   });
@@ -620,14 +645,19 @@ function renderRoomPicker(root) {
   const lo = $('#lo', root); if (lo) lo.onclick = () => B.logout();
 }
 
-async function openRoom(root, code, title) {
+async function openRoom(root, code, title, deckOverride, jumpTo) {
   H.unsubs.forEach(f => f && f()); H.unsubs = [];
   H.code = code; H.room = null; H.answers = []; H.people = []; H.seen = new Set();
   try {
     let r = await B.getRoom(code);
     if (!r) {
-      r = { title: title || (B.mode === 'demo' ? 'כנס פתיחה - המכינה הקדם-אקדמית' : 'אירוע חדש'), deck: DEFAULT_DECK, cur: { idx: -1, qid: null, open: false, view: 'wall', reveal: true }, summaries: {}, report: null, createdAt: Date.now() };
+      r = { title: title || (B.mode === 'demo' ? 'כנס פתיחה - המכינה הקדם-אקדמית' : 'אירוע חדש'), deck: deckOverride || DEFAULT_DECK, cur: { idx: -1, qid: null, open: false, view: 'wall', reveal: true }, summaries: {}, report: null, createdAt: Date.now() };
       await B.saveRoom(code, r);
+    }
+    if (jumpTo != null && !isNaN(jumpTo)) {
+      // Jump straight to the question the presentation asked for (q=0: join screen).
+      const d = r.deck || [], i = Math.max(-1, Math.min(d.length - 1, jumpTo - 1)), q = d[i];
+      await B.replaceField(code, 'cur', q ? { idx: i, qid: q.id, open: true, view: q.type === 'open' ? 'wall' : 'results', reveal: true } : { idx: -1, qid: null, open: false, view: 'wall', reveal: true });
     }
   } catch (e) { toast('אין הרשאה לחדר. בדקו שהאימייל שלכם מופיע בכללי האבטחה.'); console.error(e); return renderRoomPicker(root); }
   if (B.mode === 'live') LS.set('room', code);
