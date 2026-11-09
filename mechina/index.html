@@ -137,12 +137,15 @@ th{font-weight:600;color:var(--ink2)}
 #app.walling #toast{bottom:calc(220px + env(safe-area-inset-bottom,0px))}
 #dCompare[aria-pressed=true]{background:var(--amber);border-color:var(--amber);color:#1b2a3a}
 #app.drafting #help{display:none}
+@media (max-width:900px){ #app.panelopen #draftBar{display:none} }
 #app.drafting #toast{bottom:calc(190px + env(safe-area-inset-bottom,0px))}
 #app.drafting::after{content:"";position:absolute;inset:0;border:4px solid var(--amber);pointer-events:none;z-index:2}
 #propList{display:grid;gap:5px;margin-top:8px}
 #propList .p{display:flex;gap:6px;align-items:center;justify-content:space-between;font-size:12.5px}
 #propList .p span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#propList .p button{min-height:28px;padding:2px 8px;font-size:12px;flex:none}
+#propList .p button{min-height:32px;padding:2px 8px;font-size:12px;flex:none}
+#propList .p .btns{display:flex;gap:4px;flex:none;overflow:visible}
+#propList .p .del{color:var(--tag);border-color:var(--tag)}
 .lg{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-inline-end:3px}
 @media (max-width:900px){ #draftBar{left:calc(10px + env(safe-area-inset-left,0px));width:calc(100% - 20px);min-width:0} #app.drafting #mapbox{display:none} }
 #joy{position:absolute;bottom:calc(24px + env(safe-area-inset-bottom,0px));left:calc(24px + env(safe-area-inset-left,0px));width:120px;height:120px;border-radius:50%;background:rgba(238,240,236,.45);border:1px solid var(--line);pointer-events:none;display:none}
@@ -1000,7 +1003,10 @@ const LSP='mechina-proposals-v1', LSD='mechina-draft-open';
 let draft=null, origState=null, props={}, propCol=null, comparing=false, draftT=null;
 const clone=o=>JSON.parse(JSON.stringify(o));
 function cleanProp(id,v){ const st=cleanState(v.state||{}); return {id:String(id).slice(0,40),name:String(v.name||'הצעה').slice(0,80),state:st,base:v.base?cleanState(v.base):null,created:+v.created||Date.now(),updated:+v.updated||0}; }
-function loadProps(){ try{ const o=JSON.parse(localStorage.getItem(LSP)||'{}'); Object.keys(o).forEach(k=>{ props[k]=cleanProp(k,o[k]); }); }catch(e){} renderProps(); }
+function loadProps(){ try{ const o=JSON.parse(localStorage.getItem(LSP)||'{}'); Object.keys(o).forEach(k=>{ props[k]=cleanProp(k,o[k]); }); }catch(e){}
+  const seen=new Map(); let dropped=0; let openId=null; try{ openId=localStorage.getItem(LSD); }catch(e){}
+  Object.values(props).sort((a,b)=>(b.id===openId)-(a.id===openId)||(b.updated||0)-(a.updated||0)).forEach(p=>{ const k=p.name+'|'+stateKey(p.state); if(seen.has(k)){ delete props[p.id]; dropped++; } else seen.set(k,p.id); });
+  if(dropped) storeProps(); renderProps(); }
 function storeProps(){ try{ localStorage.setItem(LSP,JSON.stringify(props)); }catch(e){} }
 function saveDraft(){
   clearTimeout(draftT);
@@ -1016,10 +1022,10 @@ function draftUI(){
   if(!on){ comparing=false; $('dCompare').setAttribute('aria-pressed','false'); }
   resetArm(); updateDiff();
 }
-function startDraft(name,fromState){
+function startDraft(name,fromState,useId){
   if(draft) flushDraft();
   if(!draft) origState=clone(state());
-  const id='p'+Date.now().toString(36)+Math.floor(Math.random()*1e4);
+  const id=(useId&&!props[useId])?useId:'p'+Date.now().toString(36)+Math.floor(Math.random()*1e4);
   draft={id,name:(name||'').trim()||('הצעה '+new Date().toLocaleDateString('he-IL')),state:clone(fromState||state()),base:clone(origState),created:Date.now(),updated:Date.now()};
   props[id]=draft; try{ localStorage.setItem(LSD,id); }catch(e){}
   if(fromState) applyState(fromState);
@@ -1047,7 +1053,10 @@ function renderProps(){ const box=$('propList'); if(!box) return; box.innerHTML=
     const row=document.createElement('div'); row.className='p'; const t=document.createElement('span');
     const d=new Date(p.updated||p.created); t.textContent=p.name+'  ·  '+d.toLocaleDateString('he-IL',{day:'numeric',month:'numeric'});
     const b=document.createElement('button'); const cur=draft&&draft.id===p.id; b.textContent=cur?'פתוחה עכשיו':'פתיחה'; b.disabled=cur;
-    b.onclick=()=>openDraft(props[p.id]); row.append(t,b); box.appendChild(row); });
+    b.onclick=()=>openDraft(props[p.id]);
+    const x=document.createElement('button'); x.className='del'; x.textContent='מחיקה'; x.disabled=cur; x.title=cur?'כדי למחוק את ההצעה הפתוחה, השתמשו במחיקת ההצעה בפס הכתום':'';
+    x.onclick=()=>{ if(x.dataset.arm){ removeProp(p.id); toast('ההצעה נמחקה'); return; } x.dataset.arm='1'; x.textContent='בטוח?'; setTimeout(()=>{ if(x.isConnected){ delete x.dataset.arm; x.textContent='מחיקה'; } },3500); };
+    const g=document.createElement('span'); g.className='btns'; g.append(b,x); row.append(t,g); box.appendChild(row); });
   if(!Object.keys(props).length){ const e=document.createElement('p'); e.className='hint'; e.textContent='אין עדיין הצעות שמורות.'; box.appendChild(e); }
 }
 /* wall editing inside a proposal */
@@ -1553,7 +1562,7 @@ $('rooms').onchange=e=>{ const r=PLAN.rooms.find(q=>q.id===e.target.value); if(!
 $('mWalk').onclick=()=>{mode='walk';applyMode();}; $('mModel').onclick=()=>{mode='model';applyMode();}; $('mPlan').onclick=()=>{mode='plan';applyMode();};
 $('infoBtn').onclick=()=>{$('info').hidden=false;}; $('infoClose').onclick=()=>{$('info').hidden=true;};
 $('info').addEventListener('click',e=>{ if(e.target===$('info')) $('info').hidden=true; });
-function setPanel(open){ $('panel').hidden=!open; $('help').hidden=open; $('drawerBtn').setAttribute('aria-expanded',String(open)); $('drawerBtn').textContent=open?'סגירת הפריטים':'פריטים'; frameView(); }
+function setPanel(open){ $('panel').hidden=!open; $('app').classList.toggle('panelopen',open); $('help').hidden=open; $('drawerBtn').setAttribute('aria-expanded',String(open)); $('drawerBtn').textContent=open?'סגירת הפריטים':'פריטים'; frameView(); }
 $('drawerBtn').onclick=()=>setPanel($('panel').hidden);
 $('addWin').onclick=()=>{ setPlacing(!placing); if(placing&&matchMedia('(max-width:720px),(pointer:coarse)').matches) setPanel(false); };
 $('wDel').onclick=removeWin;
@@ -1603,7 +1612,7 @@ function toB32(u){ let o='',b=0,n=0; for(const v of u){ b=(b<<8)|v; n+=8; while(
 function fromB32(t){ const o=[]; let b=0,n=0; for(const c of t){ const v=B32.indexOf(c); if(v<0) throw new Error('bad'); b=(b<<5)|v; n+=5; if(n>=8){ o.push((b>>(n-8))&255); n-=8; } b&=(1<<n)-1; } return new Uint8Array(o); }
 async function pipe(u,stream){ const r=new Blob([u]).stream().pipeThrough(stream); return new Uint8Array(await new Response(r).arrayBuffer()); }
 async function encodeState(){
-  const raw=new TextEncoder().encode(JSON.stringify(draft?{...state(),pname:draft.name,pbase:origState||undefined}:state()));
+  const raw=new TextEncoder().encode(JSON.stringify(draft?{...state(),pname:draft.name,pid:draft.id,pbase:origState||undefined}:state()));
   if(window.CompressionStream){ try{ return 'lz'+toB32(await pipe(raw,new CompressionStream('deflate-raw'))); }catch(e){} }
   return 'lr'+toB32(raw);
 }
@@ -1630,10 +1639,18 @@ function cleanState(s){ // a layout from a link is outside data: keep only well-
   const re={}; if(s.rooms&&typeof s.rooms==='object') Object.keys(s.rooms).forEach(k=>{ if(!PLAN.rooms.find(r=>r.id===k)) return; const o=s.rooms[k]||{}, out={};
     if(Array.isArray(o.rects)){ const rr=o.rects.slice(0,8).filter(q=>Array.isArray(q)&&q.length===4&&q.every(v=>num(v,-1200,2400))&&q[1]>q[0]&&q[3]>q[2]); if(rr.length) out.rects=rr; }
     if(o.noPlate) out.noPlate=true; if(Object.keys(out).length) re[k]=out; });
-  return {items,windows:windowsIn,owners:own,walls:we,rooms:re,ceil:num(s.ceil,2.6,3.9)?s.ceil:CEIL,...(s.pname?{pname:txt(s.pname,80)}:{}),...(s.pbase&&typeof s.pbase==='object'&&!s.pbase.pbase?{pbase:cleanState(s.pbase)}:{})};
+  return {items,windows:windowsIn,owners:own,walls:we,rooms:re,ceil:num(s.ceil,2.6,3.9)?s.ceil:CEIL,...(s.pname?{pname:txt(s.pname,80)}:{}),...(s.pid?{pid:txt(s.pid,40)}:{}),...(s.pbase&&typeof s.pbase==='object'&&!s.pbase.pbase?{pbase:cleanState(s.pbase)}:{})};
 }
-function stripName(s){ const {pname,pbase,...r}=s; return r; }
-function openIncomingDraft(inc){ if(!draft&&pristine&&!docRef&&inc.pbase){ applyState(stripName(inc.pbase)); origState=clone(state()); savedJSON=JSON.stringify(state()); } startDraft(inc.pname||'הצעה שקיבלתם',stripName(inc)); }
+function stripName(s){ const {pname,pbase,pid,...r}=s; return r; }
+const stateKey=st=>JSON.stringify(cleanState(stripName(st||{})));
+function openIncomingDraft(inc){
+  const name=inc.pname||'הצעה שקיבלתם', key=stateKey(inc);
+  const same=Object.values(props).find(p=>stateKey(p.state)===key&&(p.id===inc.pid||p.name===name));
+  if(same){ if(!draft&&pristine&&!docRef&&inc.pbase){ applyState(stripName(inc.pbase)); origState=clone(state()); savedJSON=JSON.stringify(state()); } openDraft(same,true); toast('ההצעה הזו כבר שמורה אצלכם, והיא פתוחה עכשיו'); return; }
+  if(!draft&&pristine&&!docRef&&inc.pbase){ applyState(stripName(inc.pbase)); origState=clone(state()); savedJSON=JSON.stringify(state()); }
+  const clash=inc.pid&&props[inc.pid];
+  startDraft(clash?name+' (גרסה שהתקבלה)':name,stripName(inc),clash?null:inc.pid);
+}
 function replaceLayout(inc){ inc=stripName(inc); applyState(inc); fillOwners(); lastRoom=undefined; save(); }
 function mergeLayout(inc){ // the union of both layouts; the incoming copy wins when the same object appears twice
   const byId=(mine,theirs)=>{ const m=new Map(mine.map(x=>[x.id,x])); theirs.forEach(x=>m.set(x.id,x)); return [...m.values()]; };
