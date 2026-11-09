@@ -112,7 +112,15 @@ th{font-weight:600;color:var(--ink2)}
 #draftBar b{font-size:14px} #draftBar .note{font-size:12px;color:var(--ink2)}
 #draftDiff{font-size:12.5px;color:var(--ink)} #draftDiff span{white-space:nowrap}
 #draftBar .row button{flex:0 1 auto;min-height:30px;padding:3px 10px;font-size:13px}
-#wPick[aria-pressed=true]{background:var(--dim);color:#fff;border-color:var(--dim)}
+#wallBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);width:min(460px,calc(100% - 20px));box-sizing:border-box;padding:10px;display:grid;gap:8px;z-index:4;border:2px solid var(--dim)}
+#wallBar p{margin:0;font-size:14px;font-weight:600;text-align:center}
+#wallSel:not([hidden]){display:grid;gap:8px}
+#wallBar .nud{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+#wallBar .nud2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#wallBar button{min-height:44px;font-size:15px;padding:4px 6px}
+#wallBar .done{background:var(--dim);color:#fff;border-color:var(--dim);font-weight:700}
+#app.walling #draftBar,#app.walling #help,#app.walling #panel{display:none!important}
+#app.walling #toast{bottom:calc(220px + env(safe-area-inset-bottom,0px))}
 #dCompare[aria-pressed=true]{background:var(--amber);border-color:var(--amber);color:#1b2a3a}
 #app.drafting #help{display:none}
 #app.drafting #toast{bottom:calc(190px + env(safe-area-inset-bottom,0px))}
@@ -225,13 +233,8 @@ th{font-weight:600;color:var(--ink2)}
       <div id="propList"></div>
       <div id="wallTools" hidden style="display:grid;gap:6px;border-top:1px solid var(--line);margin-top:10px;padding-top:10px">
         <h2>קירות בהצעה</h2>
-        <p class="hint">את הקירות אפשר לשנות רק בתוך הצעה, כך שהמקור נשאר כמו שהוא.</p>
-        <div class="row"><button id="wPick" aria-pressed="false">בחירת קיר</button></div>
-        <div id="wallSel" hidden style="display:grid;gap:6px">
-          <p class="hint" id="wsInfo"></p>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button id="wsM60"></button><button id="wsP60"></button><button id="wsM10"></button><button id="wsP10"></button></div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button id="wsRm" class="danger">הסרת הקיר</button><button id="wsReset">החזרה למקור</button></div>
-        </div>
+        <p class="hint">נפתחת תוכנית מלמעלה: מקישים על קיר ומזיזים או מסירים אותו. המקור לא משתנה.</p>
+        <div class="row"><button id="wPick">עריכת קירות</button></div>
       </div>
     </details>
     <details id="ownBox"><summary>של מי החדר</summary><div id="owners"></div></details>
@@ -295,6 +298,14 @@ th{font-weight:600;color:var(--ink2)}
       </details>
       <div class="row"><button id="sClose">סגירה</button></div>
     </div>
+  </div>
+  <div id="wallBar" class="sheet" hidden role="region" aria-label="עריכת קירות">
+    <p id="wsInfo">הקישו על קיר בתוכנית</p>
+    <div id="wallSel" hidden>
+      <div class="nud" dir="ltr"><button id="wsM60"></button><button id="wsM10"></button><button id="wsP10"></button><button id="wsP60"></button></div>
+      <div class="nud2"><button id="wsRm" class="danger">הסרת הקיר</button><button id="wsReset">החזרה למקור</button></div>
+    </div>
+    <button id="wDone" class="done">סיום עריכת קירות</button>
   </div>
   <div id="draftBar" class="sheet" hidden role="region" aria-label="מצב הצעה">
     <div class="t"><b id="dName"></b><span class="note">מצב הצעה: המקור לא משתנה</span></div>
@@ -974,7 +985,7 @@ function saveDraft(){
   },400);
 }
 function draftUI(){
-  const on=!!draft; $('wallTools').hidden=!on; if(!on){ wallPick=false; selWall=null; $('wPick').setAttribute('aria-pressed','false'); hlGroup.visible=false; updateWallUI(); } $('draftBar').hidden=!on; $('app').classList.toggle('drafting',on);
+  const on=!!draft; $('wallTools').hidden=!on; if(!on&&wallPick) exitWallMode(); $('draftBar').hidden=!on; $('app').classList.toggle('drafting',on);
   if(on) $('dName').textContent='הצעה: '+draft.name;
   if(!on){ comparing=false; $('dCompare').setAttribute('aria-pressed','false'); }
   resetArm(); updateDiff();
@@ -1015,26 +1026,42 @@ function renderProps(){ const box=$('propList'); if(!box) return; box.innerHTML=
 }
 /* wall editing inside a proposal */
 let wallPick=false, selWall=null;
-const selWallMesh=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshBasicMaterial({color:0x2547a8,transparent:true,opacity:.35,depthWrite:false})); selWallMesh.visible=false; scene.add(selWallMesh);
+const selWallMesh=new THREE.Mesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshBasicMaterial({color:0xe0a020,transparent:true,opacity:.75,depthWrite:false})); selWallMesh.visible=false; selWallMesh.renderOrder=6; scene.add(selWallMesh);
 function aimAnyWall(){ const d=ray.ray.direction, o=ray.ray.origin.clone().addScaledVector(d,rayMinT()), top=(mode==='walk'||$('fullWalls').checked&&mode==='model')?CEIL:SECT;
   let best=1e9; colliders.forEach(c=>{ const t=slab3(o,d,c,top); if(t!==null&&t<best) best=t; }); if(best>=1e9) return null;
   const x=(o.x+d.x*(best+.005))*100, y=(o.z+d.z*(best+.005))*100;
   return WALLS.find(q=>x>=q.x1-.5&&x<=q.x2+.5&&y>=q.y1-.5&&y<=q.y2+.5)||null; }
-function showWallBox(mesh,w){ if(!w){ mesh.visible=false; return; } mesh.visible=true; const H=(w.h?Math.min(w.h/100,CEIL):CEIL);
-  mesh.scale.set((w.x2-w.x1)/100+.04,H+.02,(w.y2-w.y1)/100+.04); mesh.position.set((w.x1+w.x2)/200,H/2,(w.y1+w.y2)/200); }
+function showWallBox(mesh,w,minT){ if(!w){ mesh.visible=false; return; } mesh.visible=true; const H=(w.h?Math.min(w.h/100,CEIL):CEIL), mt=minT||0;
+  mesh.scale.set(Math.max(mt,(w.x2-w.x1)/100+.04),H+.02,Math.max(mt,(w.y2-w.y1)/100+.04)); mesh.position.set((w.x1+w.x2)/200,H/2,(w.y1+w.y2)/200); }
 function updateWallUI(){
-  const w=selWall&&WALLS.find(q=>wallKey(q)===selWall), base=selWall&&PLAN.walls.find(q=>q.key===selWall), e=selWall?wallEdits.edits[selWall]:null;
-  $('wallSel').hidden=!(selWall&&(w||base)); showWallBox(selWallMesh,draft?(w||null):null);
-  if(!selWall||!(w||base)) return;
-  const ref=w||base, hz=(ref.x2-ref.x1)>(ref.y2-ref.y1), len=Math.round(hz?ref.x2-ref.x1:ref.y2-ref.y1), th=Math.round(hz?ref.y2-ref.y1:ref.x2-ref.x1);
-  const lab=hz?['למעלה','למטה']:['שמאלה','ימינה'];
-  $('wsM60').textContent=lab[0]+' 60'; $('wsM10').textContent=lab[0]+' 10'; $('wsP10').textContent=lab[1]+' 10'; $('wsP60').textContent=lab[1]+' 60';
-  const moved=e&&e.d?` · הוזז ${Math.abs(e.d)} ס"מ ${e.d>0?lab[1]:lab[0]}`:'', gone=e&&e.rm?' · הוסר בהצעה':'';
-  $('wsInfo').textContent=`קיר באורך ${len} ס"מ, עובי ${th} ס"מ${base&&base.open.length?', עם '+base.open.length+' פתחים':''}${moved}${gone}. 60 ס"מ הם משבצת אחת ברצפה.`+(th>8?' קיר עבה: נראה תומך, נדרש אישור מהנדס.':'')+(ref.added?' קיר שנוסף בהצעה.':'');
+  const w=selWall&&WALLS.find(q=>wallKey(q)===selWall), base=selWall&&PLAN.walls.find(q=>q.key===selWall), e=selWall?wallEdits.edits[selWall]:null, ref=w||base;
+  $('wallSel').hidden=!(selWall&&ref); showWallBox(selWallMesh,draft&&wallPick?(w||null):null,.24);
+  if(!selWall||!ref){ $('wsInfo').textContent='הקישו על קיר בתוכנית. אפשר להזיז את התצוגה ולהגדיל בשתי אצבעות.'; return; }
+  const hz=(ref.x2-ref.x1)>(ref.y2-ref.y1), len=Math.round(hz?ref.x2-ref.x1:ref.y2-ref.y1), th=Math.round(hz?ref.y2-ref.y1:ref.x2-ref.x1);
+  const ar=hz?['▲','▼']:['◀','▶'], word=hz?['למעלה','למטה']:['שמאלה','ימינה'];
+  $('wsM60').textContent=ar[0]+' 60'; $('wsM10').textContent=ar[0]+' 10'; $('wsP10').textContent='10 '+ar[1]; $('wsP60').textContent='60 '+ar[1];
+  $('wsM60').title=$('wsM10').title=word[0]; $('wsP10').title=$('wsP60').title=word[1];
+  const st=e&&e.rm?'הוסר':e&&e.d?`הוזז ${Math.abs(e.d)} ס"מ ${e.d>0?word[1]:word[0]}`:ref.added?'נוסף בהצעה':'במקום המקורי';
+  $('wsInfo').textContent=`קיר ${len} ס"מ · ${st}`+(th>8?' · נראה תומך':'');
   ['wsM60','wsM10','wsP10','wsP60'].forEach(k=>$(k).disabled=!!(e&&e.rm)||!!ref.added); $('wsRm').disabled=!!(e&&e.rm); $('wsRm').textContent=ref.added?'מחיקת הקיר':'הסרת הקיר';
+  $('wsReset').disabled=!e;
 }
-function editWall(fn){ if(!draft||!selWall) return; const cur=wallEdits; const next=clone(cur); fn(next); wallEdits=next; applyStructure(); buildAll(); applyMode(); drawMapBase(); updateWallUI(); save(); }
-$('wPick').onclick=()=>{ wallPick=!wallPick; $('wPick').setAttribute('aria-pressed',String(wallPick)); if(wallPick){ placing&&setPlacing(false); toast('לחצו על קיר כדי לבחור אותו'); } else hlGroup.visible=false; };
+function editWall(fn){ if(!draft||!selWall) return; const cur=wallEdits; const next=clone(cur); fn(next); wallEdits=next; applyStructure(); buildAll(); applyMode(); drawMapBase(); showAllWalls(); updateWallUI(); save(); }
+const allWallsGroup=new THREE.Group(); scene.add(allWallsGroup); const allWallMat=new THREE.MeshBasicMaterial({color:0x2547a8,transparent:true,opacity:.28,depthWrite:false});
+function showAllWalls(){ while(allWallsGroup.children.length) allWallsGroup.remove(allWallsGroup.children[0]); if(!wallPick) return;
+  WALLS.forEach(w=>{ const m=new THREE.Mesh(unitBox,allWallMat); m.scale.set((w.x2-w.x1)/100+.06,SECT+.02,(w.y2-w.y1)/100+.06); m.position.set((w.x1+w.x2)/200,(SECT+.02)/2,(w.y1+w.y2)/200); allWallsGroup.add(m); }); }
+let modeBeforeWalls='walk', panelBeforeWalls=false;
+function enterWallMode(){ if(!draft) return; placing&&setPlacing(false); wallPick=true; selWall=null; modeBeforeWalls=mode; panelBeforeWalls=!$('panel').hidden; if(panelBeforeWalls) setPanel(false); if(locked) document.exitPointerLock();
+  if(mode!=='plan'){ mode='plan'; applyMode(); } $('app').classList.add('walling'); $('wallBar').hidden=false; showAllWalls(); updateWallUI(); }
+function exitWallMode(){ wallPick=false; selWall=null; $('app').classList.remove('walling'); $('wallBar').hidden=true; hlGroup.visible=false; showAllWalls(); updateWallUI();
+  if(mode!==modeBeforeWalls){ mode=modeBeforeWalls; applyMode(); } if(panelBeforeWalls&&innerWidth>720) setPanel(true); }
+$('wPick').onclick=enterWallMode; $('wDone').onclick=exitWallMode;
+/* a tap picks the nearest wall, so a thin wall is easy to hit with a finger */
+function pickWallAt(cx,cy){ setRay({clientX:cx,clientY:cy}); const pl=new THREE.Plane(new THREE.Vector3(0,1,0),-(mode==='walk'?0:SECT));
+  if(!ray.ray.intersectPlane(pl,pt)) return null; const x=pt.x*100, y=pt.z*100;
+  setRay({clientX:cx+24,clientY:cy}); const p2=new THREE.Vector3(); ray.ray.intersectPlane(pl,p2); const thr=Math.max(25,Math.hypot(p2.x*100-x,p2.z*100-y));
+  let best=null,bd=1e9; WALLS.forEach(w=>{ const dx=Math.max(w.x1-x,0,x-w.x2), dy=Math.max(w.y1-y,0,y-w.y2), d=Math.hypot(dx,dy); if(d<bd){ bd=d; best=w; } });
+  return bd<=thr?best:null; }
 const nudge=d=>editWall(n=>{ const e=n.edits[selWall]||{}; const v=(e.d||0)+d; if(v) n.edits[selWall]={d:v}; else delete n.edits[selWall]; });
 $('wsM60').onclick=()=>nudge(-60); $('wsM10').onclick=()=>nudge(-10); $('wsP10').onclick=()=>nudge(10); $('wsP60').onclick=()=>nudge(60);
 $('wsRm').onclick=()=>editWall(n=>{ if(selWall.startsWith('n:')){ n.add=n.add.filter(a=>'n:'+a.id!==selWall); selWall=null; } else n.edits[selWall]={rm:true}; windows=windows.filter(u=>u.wall!==selWall||!n.edits[u.wall]); });
@@ -1224,14 +1251,13 @@ function stickEnd(){ stick.id=null; joyVec={x:0,y:0}; const j=$('joy'); j.style.
 function capture(id){ try{ canvas.setPointerCapture(id); }catch(e){} }
 canvas.addEventListener('pointerdown',e=>{
   if(locked){ e.preventDefault(); crosshairClick(); return; }
-  if(wallPick&&draft){ setRay(e); const w=aimAnyWall(); if(w){ selWall=wallKey(w); updateWallUI(); if($('panel').hidden) setPanel(true); } else toast('לא נמצא כאן קיר'); return; }
   if(placing){ setRay(e); const a=aimWall(); if(a) placeWindow(a); else toast('כאן אין קיר שאפשר לשים בו חלון. נסו קיר אחר.'); return; }
   capture(e.pointerId);
   const rec={x:e.clientX,y:e.clientY,moved:0,role:'look',mouse:e.pointerType==='mouse'};
   ptrs.set(e.pointerId,rec);
   if(e.pointerType==='touch'&&!touchedOnce){ touchedOnce=true; updateHelp(); }
   if(mode!=='walk'&&ptrs.size===2){ const [a,b]=[...ptrs.values()]; pinch0=Math.hypot(a.x-b.x,a.y-b.y); dragging=null; a.role=b.role='pinch'; return; }
-  const id=dragging?null:pickItem(e);
+  const id=(dragging||(wallPick&&draft))?null:pickItem(e);
   if(id&&items.find(i=>i.id===id).pin){ select(id); rec.role='pinned'; toast('הפריט נעול. אפשר לפתוח אותו בחלונית או במקש L.'); return; }
   if(id){ select(id); const it=items.find(i=>i.id===id); setRay(e); if(ray.ray.intersectPlane(floorPlane,pt)) dragging={it,ox:it.x-pt.x,oz:it.z-pt.z,pid:e.pointerId}; rec.role='item'; canvas.classList.add('drag'); return; }
   setRay(e); const aim=aimWall();
@@ -1264,10 +1290,11 @@ function finishPtr(pid,p,type){
   if(p.role==='stick') stickEnd();
   if(p.role==='win'){ if(p.moved>3){ drawMapBase(); save(); } updateSelUI(); }
   if(p.role==='item'&&dragging){ if(p.moved>3) save(); dragging=null; updateSelUI(); }
-  if(p.role==='look'&&p.moved<5){ selWin=null; select(null); if(p.mouse&&mode==='walk'&&type==='pointerup') enterLock(); }
+  if(wallPick&&draft&&p.moved<8&&(p.role==='look'||p.role==='pan')){ const w=pickWallAt(p.x,p.y); if(w){ selWall=wallKey(w); updateWallUI(); } else $('wsInfo').textContent='לא נמצא קיר קרוב. הקישו על הקו של הקיר.'; }
+  else if(p.role==='look'&&p.moved<5){ selWin=null; select(null); if(p.mouse&&mode==='walk'&&type==='pointerup') enterLock(); }
   if(ptrs.size===0) canvas.classList.remove('drag');
 }
-canvas.addEventListener('pointermove',e=>{ if(placing&&!locked&&ptrs.size===0){ setRay(e); hoverWall(); } else if(wallPick&&draft&&!locked&&ptrs.size===0){ setRay(e); const w=aimAnyWall(); hlGroup.visible=!!w; ghostWin.visible=false; if(w){ MATS.hl.color.setHex(0x2547a8); showWallBox(ghostWall,w); } } });
+canvas.addEventListener('pointermove',e=>{ if(placing&&!locked&&ptrs.size===0){ setRay(e); hoverWall(); } else if(wallPick&&draft&&!locked&&ptrs.size===0&&e.pointerType==='mouse'){ const w=pickWallAt(e.clientX,e.clientY); hlGroup.visible=!!w; ghostWin.visible=false; if(w){ MATS.hl.color.setHex(0x2547a8); showWallBox(ghostWall,w); } } });
 canvas.addEventListener('pointerleave',()=>{ if(softLook&&!locked){ softLook=false; updateHelp(); } });
 addEventListener('pointerup',endPtr,true); addEventListener('pointercancel',endPtr,true);
 
@@ -1627,7 +1654,7 @@ function frame(){
     camera.lookAt(orbit.tx,0,orbit.tz);
     avatar.visible=true; if(camCut>0||camPlane.constant<1e5){ camCut=0; camPlane.normal.set(0,0,1); camPlane.constant=1e6; }
     const k=2*Math.tan(camera.fov*Math.PI/360)/innerHeight;
-    labels.children.forEach(s=>{ const h=s.userData.h*k*.72; s.scale.set(h*s.userData.aspect,h,1); });
+    labels.children.forEach(s=>{ const h=s.userData.h*k*(innerWidth<560?.52:.72); s.scale.set(h*s.userData.aspect,h,1); });
   }
   if(winDirty){ winDirty=false; buildAll(); applyMode(); updateOutline(); }
   scene.userData.sky.position.copy(camera.position);
