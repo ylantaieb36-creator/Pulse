@@ -98,7 +98,13 @@ th{font-weight:600;color:var(--ink2)}
 #sendBox{max-width:560px;width:100%;max-height:100%;overflow:auto;padding:18px;box-sizing:border-box;display:grid;gap:10px}
 #sendBox h2{margin:0;font-size:18px} #sendBox h3{margin:6px 0 0;font-size:14px} #sendBox p{margin:0;max-width:62ch}
 #sendBox textarea{width:100%;box-sizing:border-box;min-height:64px;border:1px solid var(--line);border-radius:3px;background:#fff;padding:6px;font:12px var(--mono);direction:ltr;resize:vertical}
-#sMsg{min-height:1.4em;font-size:12.5px;color:var(--dim)}
+#sMsg{min-height:1.4em;font-size:13px;color:var(--dim)}
+#sendBox .big{display:flex;align-items:center;justify-content:center;min-height:50px;font-size:16px;font-weight:700;border-radius:6px;text-decoration:none;border:1px solid var(--ink);background:var(--ink);color:#fff;box-sizing:border-box}
+#sendBox .big.wa{background:#1f8f4e;border-color:#1f8f4e}
+#sendBox .big.alt{background:var(--paper);color:var(--ink)}
+#sendBox .big[aria-disabled=true]{opacity:.5;pointer-events:none}
+#sendBox details summary{font-size:13px;font-weight:600;cursor:pointer}
+#sendBox details[open]{display:grid;gap:8px}
 #incoming{position:absolute;top:calc(112px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);padding:12px;display:grid;gap:8px;z-index:4;width:min(440px,calc(100% - 32px));box-sizing:border-box}
 #incoming p{margin:0;font-weight:600}
 #draftBar{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(240px + env(safe-area-inset-left,0px));width:min(600px,calc(100% - 560px));min-width:min(420px,calc(100% - 20px));box-sizing:border-box;padding:8px 12px;display:grid;gap:6px;z-index:3;border:2px solid var(--amber)}
@@ -274,17 +280,19 @@ th{font-weight:600;color:var(--ink2)}
     </div>
   </div>
   <div id="send" hidden>
-    <div id="sendBox" class="sheet" role="dialog" aria-label="שליחה ושיתוף">
-      <h2>שליחה ושיתוף</h2>
-      <p>הקישור כולל את הסידור כפי שהוא עכשיו. מי שיפתח אותו יראה את הסידור, יוכל להוסיף עליו ולשלוח לכם בחזרה קישור מאותו כפתור.</p>
-      <div class="row"><button id="sCopy">העתקת קישור עם הסידור שלי</button></div>
-      <label for="sLink" class="hint">אם ההעתקה לא עבדה, סמנו והעתיקו מכאן:</label>
-      <textarea id="sLink" readonly></textarea>
-      <h3>קיבלתם סידור בחזרה?</h3>
-      <label for="sIn" class="hint">הדביקו כאן את הקישור שקיבלתם:</label>
-      <textarea id="sIn"></textarea>
-      <div class="row"><button id="sDraft">פתיחה כהצעה</button><button id="sMerge">הוספה לסידור שלי</button><button id="sReplace" class="danger">החלפת הסידור שלי</button></div>
+    <div id="sendBox" class="sheet" role="dialog" aria-label="שליחה">
+      <h2 id="sTitle">שליחה</h2>
+      <p id="sWhat"></p>
+      <a id="sWa" class="big wa" href="#" target="_blank" rel="noopener">שליחה בוואטסאפ</a>
+      <button id="sShare" class="big" hidden>שיתוף בדרך אחרת</button>
+      <button id="sCopy" class="big alt">העתקת הקישור</button>
       <div id="sMsg" role="status"></div>
+      <details id="sRaw"><summary>הקישור עצמו</summary><textarea id="sLink" readonly aria-label="הקישור"></textarea></details>
+      <details id="sBack"><summary>קיבלתם הצעה או סידור בחזרה?</summary>
+        <p class="hint">בדרך כלל מספיק ללחוץ על הקישור שקיבלתם. אם הוא נפתח במקום אחר, הדביקו אותו כאן:</p>
+        <textarea id="sIn" aria-label="הדבקת קישור"></textarea>
+        <div class="row"><button id="sDraft">פתיחה כהצעה</button><button id="sMerge">הוספה לסידור שלי</button><button id="sReplace" class="danger">החלפת הסידור שלי</button></div>
+      </details>
       <div class="row"><button id="sClose">סגירה</button></div>
     </div>
   </div>
@@ -1079,13 +1087,14 @@ function arm(btn,label,fn){ if(armed===btn){ resetArm(); fn(); return; } resetAr
 $('pNew').onclick=()=>{ startDraft($('pName').value); $('pName').value=''; };
 $('pName').addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); $('pNew').click(); } });
 $('dCompare').onclick=()=>{ comparing=!comparing; $('dCompare').setAttribute('aria-pressed',String(comparing)); updateDiff(); if(comparing) toast('ירוק: נוסף · כתום: המקום המקורי של פריט שהוזז · אדום: פריט שנמחק'); };
-$('dSend').onclick=()=>$('sendBtn').click();
+$('dSend').onclick=prepareSend;
 $('dExit').onclick=exitDraft;
 $('dApply').onclick=()=>{ const changed=origState&&draft.base&&JSON.stringify(cleanState(origState))!==JSON.stringify(cleanState(draft.base));
   arm('dApply',changed?'המקור השתנה מאז. ללחוץ שוב כדי להחליף אותו בכל זאת':'ללחוץ שוב כדי להחליף את המקור',applyDraft); };
 $('dDel').onclick=()=>arm('dDel','ללחוץ שוב למחיקת ההצעה',deleteDraft);
 
-const ARTIFACT_URL=location.href.split('#')[0];
+const SITE_URL='https://ylantaieb36-creator.github.io/Pulse/mechina/';
+const ARTIFACT_URL=/github\.io$/.test(location.hostname)?location.href.split('#')[0]:SITE_URL;
 let db=null, docRef=null, savedJSON='';
 const LS='mechina-layout-v1';
 const state=()=>({items,ceil:CEIL,owners,windows,walls:wallEdits,rooms:roomEdits});
@@ -1493,7 +1502,7 @@ function toB32(u){ let o='',b=0,n=0; for(const v of u){ b=(b<<8)|v; n+=8; while(
 function fromB32(t){ const o=[]; let b=0,n=0; for(const c of t){ const v=B32.indexOf(c); if(v<0) throw new Error('bad'); b=(b<<5)|v; n+=5; if(n>=8){ o.push((b>>(n-8))&255); n-=8; } b&=(1<<n)-1; } return new Uint8Array(o); }
 async function pipe(u,stream){ const r=new Blob([u]).stream().pipeThrough(stream); return new Uint8Array(await new Response(r).arrayBuffer()); }
 async function encodeState(){
-  const raw=new TextEncoder().encode(JSON.stringify(draft?{...state(),pname:draft.name}:state()));
+  const raw=new TextEncoder().encode(JSON.stringify(draft?{...state(),pname:draft.name,pbase:origState||undefined}:state()));
   if(window.CompressionStream){ try{ return 'lz'+toB32(await pipe(raw,new CompressionStream('deflate-raw'))); }catch(e){} }
   return 'lr'+toB32(raw);
 }
@@ -1520,9 +1529,10 @@ function cleanState(s){ // a layout from a link is outside data: keep only well-
   const re={}; if(s.rooms&&typeof s.rooms==='object') Object.keys(s.rooms).forEach(k=>{ if(!PLAN.rooms.find(r=>r.id===k)) return; const o=s.rooms[k]||{}, out={};
     if(Array.isArray(o.rects)){ const rr=o.rects.slice(0,8).filter(q=>Array.isArray(q)&&q.length===4&&q.every(v=>num(v,-1200,2400))&&q[1]>q[0]&&q[3]>q[2]); if(rr.length) out.rects=rr; }
     if(o.noPlate) out.noPlate=true; if(Object.keys(out).length) re[k]=out; });
-  return {items,windows:windowsIn,owners:own,walls:we,rooms:re,ceil:num(s.ceil,2.6,3.9)?s.ceil:CEIL,...(s.pname?{pname:txt(s.pname,80)}:{})};
+  return {items,windows:windowsIn,owners:own,walls:we,rooms:re,ceil:num(s.ceil,2.6,3.9)?s.ceil:CEIL,...(s.pname?{pname:txt(s.pname,80)}:{}),...(s.pbase&&typeof s.pbase==='object'&&!s.pbase.pbase?{pbase:cleanState(s.pbase)}:{})};
 }
-function stripName(s){ const {pname,...r}=s; return r; }
+function stripName(s){ const {pname,pbase,...r}=s; return r; }
+function openIncomingDraft(inc){ if(!draft&&pristine&&!docRef&&inc.pbase){ applyState(stripName(inc.pbase)); origState=clone(state()); savedJSON=JSON.stringify(state()); } startDraft(inc.pname||'הצעה שקיבלתם',stripName(inc)); }
 function replaceLayout(inc){ inc=stripName(inc); applyState(inc); fillOwners(); lastRoom=undefined; save(); }
 function mergeLayout(inc){ // the union of both layouts; the incoming copy wins when the same object appears twice
   const byId=(mine,theirs)=>{ const m=new Map(mine.map(x=>[x.id,x])); theirs.forEach(x=>m.set(x.id,x)); return [...m.values()]; };
@@ -1534,25 +1544,38 @@ async function processLink(){
   const h=(location.hash||'').slice(1); if(!/^l[zr][a-z2-7]{8,}$/.test(h)) return;
   try{ const inc=await decodeState(h);
     if(pristine&&!docRef&&!inc.pname){ applyState(inc); fillOwners(); lastRoom=undefined; savedJSON=JSON.stringify(state()); origState=clone(state()); toast('נפתח הסידור שנשלח אליכם'); return; }
-    if(inc.pname&&!draft&&pristine&&!docRef){ startDraft(inc.pname,stripName(inc)); clearLinkHash(); return; }
+    if(inc.pname&&!draft&&pristine&&!docRef){ openIncomingDraft(inc); clearLinkHash(); return; }
     pendingLink=inc; $('incoming').firstElementChild.textContent=inc.pname?'קיבלתם הצעה: '+inc.pname:'קיבלתם סידור בקישור'; $('incoming').hidden=false;
   }catch(e){ toast('הקישור שקיבלתם לא תקין או נקטע. בקשו שישלחו אותו שוב.'); }
 }
 addEventListener('hashchange',processLink);
-$('inDraft').onclick=()=>{ if(pendingLink) startDraft(pendingLink.pname||'הצעה שקיבלתם',stripName(pendingLink)); pendingLink=null; $('incoming').hidden=true; clearLinkHash(); };
+$('inDraft').onclick=()=>{ if(pendingLink) openIncomingDraft(pendingLink); pendingLink=null; $('incoming').hidden=true; clearLinkHash(); };
 $('inMerge').onclick=()=>{ if(pendingLink) mergeLayout(pendingLink); pendingLink=null; $('incoming').hidden=true; clearLinkHash(); toast('הסידור נוסף'); };
 $('inReplace').onclick=()=>{ if(pendingLink) replaceLayout(pendingLink); pendingLink=null; $('incoming').hidden=true; clearLinkHash(); toast('הסידור נפתח'); };
 $('inSkip').onclick=()=>{ pendingLink=null; $('incoming').hidden=true; clearLinkHash(); };
-$('sendBtn').onclick=async()=>{ $('send').hidden=false; $('sCopy').textContent=draft?'העתקת קישור להצעה "'+draft.name+'"':'העתקת קישור עם הסידור שלי'; $('sMsg').textContent=''; const code=await encodeState(); $('sLink').value=ARTIFACT_URL+'#'+code; };
+let sendLink='', sendText='';
+async function prepareSend(){
+  $('send').hidden=false; $('sMsg').textContent=''; $('sWa').setAttribute('aria-disabled','true'); $('sRaw').open=false; $('sBack').open=false;
+  const isDraft=!!draft;
+  $('sTitle').textContent=isDraft?'שליחת ההצעה: '+draft.name:'שליחת הסידור';
+  $('sWhat').textContent=isDraft?'מי שיקבל את הקישור יראה את ההצעה ליד הסידור המקורי, יוכל להסתובב בה ולשנות אותה, ולשלוח לכם בחזרה מאותו כפתור. לא צריך חשבון.':'מי שיקבל את הקישור יראה את הסידור, יוכל להסתובב ולהוסיף דברים, ולשלוח לכם בחזרה מאותו כפתור. לא צריך חשבון.';
+  sendLink=ARTIFACT_URL+'#'+await encodeState();
+  sendText=(isDraft?'הצעה לסידור המכינה: '+draft.name:'הסידור של המכינה בבניין החדש')+'\nאפשר להסתובב, לשנות ולשלוח בחזרה:\n'+sendLink;
+  $('sLink').value=sendLink;
+  $('sWa').href='https://wa.me/?text='+encodeURIComponent(sendText); $('sWa').removeAttribute('aria-disabled');
+  $('sShare').hidden=!(navigator.share&&/github\.io$/.test(location.hostname));
+}
+$('sendBtn').onclick=prepareSend;
 $('sClose').onclick=()=>{ $('send').hidden=true; };
 $('send').addEventListener('click',e=>{ if(e.target===$('send')) $('send').hidden=true; });
-$('sCopy').onclick=async()=>{ const v=ARTIFACT_URL+'#'+await encodeState(); $('sLink').value=v;
-  const sel=()=>{ $('sLink').focus(); $('sLink').select(); };
-  try{ await navigator.clipboard.writeText(v); $('sMsg').textContent='הקישור הועתק. אפשר להדביק אותו בוואטסאפ או במייל.'; }
-  catch(e){ sel(); $('sMsg').textContent='סימנתי את הקישור, העתיקו אותו ידנית.'; } };
+$('sWa').addEventListener('click',e=>{ if(!sendLink){ e.preventDefault(); return; } setTimeout(()=>{ $('sMsg').textContent='אם וואטסאפ לא נפתח, לחצו על העתקת הקישור והדביקו אותו בשיחה.'; },1200); });
+$('sShare').onclick=async()=>{ try{ await navigator.share({title:'הדמיית המכינה',text:sendText.replace(sendLink,'').trim(),url:sendLink}); }catch(e){ if(e&&e.name!=='AbortError'){ $('sShare').hidden=true; $('sMsg').textContent='השיתוף לא זמין כאן. השתמשו בוואטסאפ או בהעתקה.'; } } };
+$('sCopy').onclick=async()=>{ if(!sendLink) return;
+  try{ await navigator.clipboard.writeText(sendText); $('sMsg').textContent='הקישור הועתק. הדביקו אותו בוואטסאפ, במייל או בכל מקום אחר.'; }
+  catch(e){ $('sRaw').open=true; $('sLink').focus(); $('sLink').select(); $('sMsg').textContent='ההעתקה האוטומטית לא עבדה כאן. סימנתי את הקישור, לחצו לחיצה ארוכה ובחרו העתקה.'; } };
 const fromPaste=async fn=>{ try{ const inc=await decodeState($('sIn').value); fn(inc); $('sIn').value=''; $('sMsg').textContent=`נטען: ${inc.items.length} פריטים, ${inc.windows.length} חלונות.`; }
   catch(e){ $('sMsg').textContent='לא הצלחתי לקרוא את הקישור. ודאו שהעתקתם אותו במלואו.'; } };
-$('sDraft').onclick=()=>fromPaste(inc=>{ startDraft(inc.pname||'הצעה שקיבלתם',stripName(inc)); $('send').hidden=true; });
+$('sDraft').onclick=()=>fromPaste(inc=>{ openIncomingDraft(inc); $('send').hidden=true; });
 $('sMerge').onclick=()=>fromPaste(inc=>mergeLayout(inc));
 $('sReplace').onclick=()=>fromPaste(replaceLayout);
 
